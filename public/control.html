@@ -25,6 +25,7 @@
       .foul-controls { display:flex; gap:4px; }
       .timer-controls { display:flex; gap:4px; }
       .team-library-controls { display:grid; gap:6px; }
+      .playhq-options { display:grid; gap:5px; color:#000; }
       .foul-announcement-controls { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
       .foul-announcement-controls > div:last-child { grid-column:1 / -1; }
 
@@ -250,12 +251,17 @@
       </div>
       <div class="panel desktop-only">
         <h3>PlayHQ Live Data</h3>
-        <div class="lineup-help">Poll a public PlayHQ game-centre link every 10 seconds.</div>
+        <div class="lineup-help">Poll a public PlayHQ game-centre link at the interval you choose.</div>
         <div>
           <input id="playHqUrl" placeholder="https://www.playhq.com/.../game-centre/..." style="width:100%" />
         </div>
         <div style="margin-top:6px">
-          <label><input id="playHqEnabled" type="checkbox" /> Enable live polling</label>
+          <div class="playhq-options">
+          <label><input id="playHqEnabled" type="checkbox" /> Enable PlayHQ player-stat polling</label>
+          <label><input id="playHqUseScore" type="checkbox" /> Replace scoreboard scores with PlayHQ scores</label>
+          <label><input id="playHqUseTime" type="checkbox" /> Replace scoreboard clock with PlayHQ time</label>
+          </div>
+          <label>Poll every <input id="playHqPollSeconds" type="number" min="1" max="300" value="10" style="width:60px" /> seconds</label>
           <button class="btn" onclick="savePlayHqFeed()">Apply Feed</button>
         </div>
         <div id="playHqStatus" class="lineup-help">Not connected</div>
@@ -346,7 +352,11 @@
         document.getElementById('tipoffShowScore').checked = state.tipoffShowScore !== false;
         document.getElementById('playHqUrl').value = state.liveFeed?.url || '';
         document.getElementById('playHqEnabled').checked = !!state.liveFeed?.enabled;
-        const feedStatus = state.liveFeed?.error ? `Error: ${state.liveFeed.error}` : state.liveFeed?.enabled ? `Polling every 10 seconds${state.liveFeed.lastUpdated ? `; updated ${state.liveFeed.lastUpdated}` : ''}` : 'Not connected';
+        document.getElementById('playHqUseScore').checked = !!state.liveFeed?.useScore;
+        document.getElementById('playHqUseTime').checked = !!state.liveFeed?.useTime;
+        document.getElementById('playHqPollSeconds').value = state.liveFeed?.pollSeconds || 10;
+        const pollSeconds = state.liveFeed?.pollSeconds || 10;
+        const feedStatus = state.liveFeed?.error ? `Error: ${state.liveFeed.error}` : state.liveFeed?.enabled ? `Polling every ${pollSeconds} seconds${state.liveFeed.lastUpdated ? `; updated ${state.liveFeed.lastUpdated}` : ''}` : 'Not connected';
         document.getElementById('playHqStatus').textContent = feedStatus;
         if (!lineupInitialised) {
           document.getElementById('homeLineupInput').value = lineupText(state.home.lineup);
@@ -518,7 +528,10 @@
       function savePlayHqFeed() {
         socket.emit('playHqFeed', {
           url: document.getElementById('playHqUrl').value.trim(),
-          enabled: document.getElementById('playHqEnabled').checked
+          enabled: document.getElementById('playHqEnabled').checked,
+          useScore: document.getElementById('playHqUseScore').checked,
+          useTime: document.getElementById('playHqUseTime').checked,
+          pollSeconds: document.getElementById('playHqPollSeconds').value
         });
       }
       function showPlayerStats() {
