@@ -42,6 +42,18 @@ function normaliseTeam(team) {
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json({ limit: '1mb' }));
 
+const pageAliases = {
+  '/control': 'control.html',
+  '/team-entry': 'team-entry.html',
+  '/tipoff': 'tipoff.html',
+  '/lineup': 'lineup.html',
+  '/foul': 'foul.html',
+  '/stats': 'stats.html'
+};
+Object.entries(pageAliases).forEach(([route, file]) => {
+  app.get(route, (req, res) => res.sendFile(path.join(__dirname, 'public', file)));
+});
+
 app.get('/api/teams', (req, res) => {
   res.json({ teams: readTeams() });
 });

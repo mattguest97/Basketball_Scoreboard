@@ -1,6 +1,8 @@
 # Scoreboard Scripting
 
-I looed around and couldn't find a easy to use and smart looking score board to stream into OBS for streaming basketball games. Therefore I made one. The elements that are made on the end points and be overlayed bu HTML into OBS, and then easily controlled from a laptop (full controls) or a mobile by just using the web controls (sub-set of the controls). I use a camera to stream it then a cold shoe phone mount to control the stream elements. 
+This is a Javascript app that allows for the generation of streaming assets with easy integration into OBS. It is designed to be used from a laptop for set-up and then a phone for during play. This allows a scorer and filmer to work as the same person or seperate.
+
+The elements that are made on the end points and be overlayed bu HTML into OBS, and then easily controlled from a laptop (full controls) or a mobile by just using the web controls (sub-set of the controls). I use a camera to stream it then a cold shoe phone mount to control the stream elements. 
 
 The FIBA stats are currently a work in progress and don't currently work. I am also looking into integration of Basketball Englands Play HQ, both for live stats and live score/scoreboard. 
 
@@ -33,14 +35,11 @@ npm ci
 npm start
 ```
 
-The default port is `3000`. Set `PORT` to use another port:
-
-```powershell
-$env:PORT = 3001
-python start.py
-```
+The default port is `3000`. 
 
 Stop the server with `Ctrl+C`.
+
+Connect on a phone by using the host IP address. All end points are visable. (Control.html has custom layout)
 
 ## Endpoints
 
@@ -49,14 +48,14 @@ All pages are served from `public/` by the Express static-file server.
 | URL | Purpose |
 | --- | --- |
 | `/` | Main scoreboard display |
-| `/control.html` | Live operator control panel |
-| `/team-entry.html` | Create and edit saved teams and numbered players |
-| `/tipoff.html` | Transparent pre-game countdown overlay |
-| `/lineup.html` | Line-up overlay; use `?team=home`, `?team=away`, or `?pregame=1` |
-| `/foul.html` | Foul announcement overlay |
-| `/stats.html` | FIBA Live Stats preview viewer |
+| `/control` | Live operator control panel |
+| `/team-entry` | Create and edit saved teams and numbered players |
+| `/tipoff` | Transparent pre-game countdown overlay |
+| `/lineup` | Line-up overlay; use `?team=home`, `?team=away`, or `?pregame=1` |
+| `/foul` | Foul announcement overlay |
+| `/stats` | FIBA Live Stats preview viewer |
 | `/api/teams` | List, save, and delete saved team profiles |
-| `POST /api/fiba` | Broadcast a JSON stats payload to connected stats viewers |
+| `POST /api/fiba` | Broadcast a JSON stats payload to connected stats viewers - currently defective|
 
 ## Example Stream
 

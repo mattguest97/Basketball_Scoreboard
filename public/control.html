@@ -157,7 +157,7 @@
           </label>
           </div>
           <div>
-          <label>Player #: <input id="announcePlayer" placeholder="23" style="width:80px"/></label>
+          <label>Player #: <input id="announcePlayer" input type="number" style="width:80px"/></label>
           </div>
           <div>
           <label>Type:
@@ -173,10 +173,10 @@
           <label>Duration (sec): <input id="announceDuration" type="number" value="4" min="1" style="width:80px"/></label>
           </div>
           <div>
-            <button class="btn" onclick="announceFoul()">Show Announcement</button>
+            <button class="btn" onclick="announceFoul()">Announcement</button>
           </div>
         </div>
-        <div style="margin-top:8px;font-size:13px;color:#666">Also view at <a href="/foul.html" target="_blank">/foul.html</a></div>
+        <div style="margin-top:8px;font-size:13px;color:#666">Also view at <a href="/foul" target="_blank">/foul</a></div>
       </div>
       <div class="panel">
         <h3>Team Line-up</h3>
@@ -186,9 +186,9 @@
         <label>Away</label>
         <textarea id="awayLineupInput" class="lineup-input" placeholder="4 | Player Name | 0 | 0"></textarea>
         <button class="btn" onclick="saveLineup()">Save Line-up</button>
-        <a href="/lineup.html" target="_blank">Open Line-up Overlay</a>
-        <div><a href="/lineup.html?team=home" target="_blank">Home only</a> | <a href="/lineup.html?team=away" target="_blank">Away only</a></div>
-        <div><a href="/lineup.html?pregame=1" target="_blank">Pre-game: both</a> | <a href="/lineup.html?team=home&pregame=1" target="_blank">Home</a> | <a href="/lineup.html?team=away&pregame=1" target="_blank">Away</a></div>
+        <a href="/lineup" target="_blank">Open Line-up Overlay</a>
+        <div><a href="/lineup?team=home" target="_blank">Home only</a> | <a href="/lineup?team=away" target="_blank">Away only</a></div>
+        <div><a href="/lineup?pregame=1" target="_blank">Pre-game: both</a> | <a href="/lineup?team=home&pregame=1" target="_blank">Home</a> | <a href="/lineup?team=away&pregame=1" target="_blank">Away</a></div>
         <div id="lineupStatus" style="margin-top:4px;color:#666;font-size:12px"></div>
       </div>
       <div class="panel">
@@ -215,7 +215,7 @@
           </div>
         </div>
         <div id="teamLibraryStatus" style="margin-top:4px;color:#666;font-size:12px"></div>
-        <div style="margin-top:8px"><a href="/team-entry.html" target="_blank">Open Team Entry Page</a></div>
+        <div style="margin-top:8px"><a href="/team-entry" target="_blank">Open Team Entry Page</a></div>
       </div>
       <div class="panel">
         <h3>Tip-off Banner</h3>
@@ -245,7 +245,7 @@
           <button id="stopTipoffBtn" class="btn" onclick="tipoffAction('pause')">Stop Countdown</button>
           <span id="tipoffCurrent" class="lineup-help">30:00 Stopped</span>
         </div>
-        <a href="/tipoff.html" id="tipoffLink" target="_blank">Open Tip-off Overlay</a>
+        <a href="/tipoff" id="tipoffLink" target="_blank">Open Tip-off Overlay</a>
       </div>
       <div class="panel">
         <h3>Stats Control (FIBA example)</h3>
@@ -395,9 +395,21 @@
         await saveTeamProfile({ ...draft, id: selected.id }, 'Saved team updated');
       }
 
-      function loadSavedTeam() {
+      async function loadSavedTeam() {
+        const selectedId = document.getElementById('savedTeamSelect').value;
+        if (!selectedId) return teamLibraryStatus('Select a saved team first');
+        teamLibraryStatus('Reloading saved teams...');
+        try {
+          const response = await fetch('/api/teams', { cache: 'no-store' });
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.error || 'Could not reload saved teams');
+          savedTeams = Array.isArray(data.teams) ? data.teams : [];
+          renderSavedTeams(selectedId);
+        } catch (error) {
+          return teamLibraryStatus(error.message);
+        }
         const selected = getSelectedSavedTeam();
-        if (!selected) return teamLibraryStatus('Select a saved team first');
+        if (!selected) return teamLibraryStatus('Selected team is no longer available');
         const side = document.getElementById('savedTeamSide').value;
         setTeamInputs(side, selected);
         const teamPatch = {};

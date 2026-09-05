@@ -3,18 +3,18 @@
     {
       "id": "portsmouth-force",
       "name": "Force",
-      "color": "#05eb55",
+      "color": "#13067a",
       "logo": "",
       "players": [
         {
           "number": "1",
-          "name": "Smith",
+          "name": "Guest",
           "points": 0,
           "fouls": 0
         },
         {
           "number": "2",
-          "name": "Smith",
+          "name": "Milner",
           "points": 0,
           "fouls": 0
         },
