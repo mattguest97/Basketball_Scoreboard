@@ -14,7 +14,7 @@
       .field { display: grid; gap: 6px; margin-bottom: 14px; }
       input, select, button { font: inherit; padding: 8px; }
       input[type="color"] { height: 40px; width: 70px; padding: 2px; }
-      .player { display: grid; grid-template-columns: 80px 1fr 90px 90px auto; gap: 8px; margin-bottom: 8px; }
+      .player { display: grid; grid-template-columns: 70px 1fr 75px 75px 65px 65px 65px auto; gap: 8px; margin-bottom: 8px; }
       button { cursor: pointer; border: 1px solid #9aa4af; border-radius: 4px; background: #fff; }
       button.primary { color: #fff; border-color: #0052cc; background: #0052cc; }
       .actions { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -39,6 +39,10 @@
         <div class="field">
           <label for="teamName">Team name</label>
           <input id="teamName" maxlength="80" required placeholder="e.g. Portsmouth Force" />
+        </div>
+        <div class="field">
+          <label for="teamShortName">Short display name (optional)</label>
+          <input id="teamShortName" maxlength="40" placeholder="e.g. Force" />
         </div>
         <div class="field">
           <label for="teamColor">Team color</label>
@@ -76,6 +80,9 @@
           `<input class="player-name" maxlength="80" placeholder="Player name" value="${escapeAttribute(player.name || '')}" aria-label="Player name" />` +
           `<input class="player-points" type="number" min="0" step="1" placeholder="Points" value="${Number(player.points) || 0}" aria-label="Player points" />` +
           `<input class="player-fouls" type="number" min="0" step="1" placeholder="Fouls" value="${Number(player.fouls) || 0}" aria-label="Player fouls" />` +
+          `<input class="player-one-point" type="number" min="0" step="1" placeholder="1PT" value="${Number(player.onePoint) || 0}" aria-label="One point scores" />` +
+          `<input class="player-two-point" type="number" min="0" step="1" placeholder="2PT" value="${Number(player.twoPoint) || 0}" aria-label="Two point scores" />` +
+          `<input class="player-three-point" type="number" min="0" step="1" placeholder="3PT" value="${Number(player.threePoint) || 0}" aria-label="Three point scores" />` +
           '<button type="button" onclick="this.parentElement.remove()">Remove</button>';
         document.getElementById('players').appendChild(row);
       }
@@ -92,6 +99,7 @@
         selectedTeamId = team ? team.id : '';
         document.getElementById('existingTeam').value = selectedTeamId;
         document.getElementById('teamName').value = team ? team.name : '';
+        document.getElementById('teamShortName').value = team ? (team.shortName || '') : '';
         document.getElementById('teamColor').value = team ? team.color : '#0052cc';
         document.getElementById('teamLogo').value = team ? team.logo : '';
         document.getElementById('players').innerHTML = '';
@@ -127,7 +135,10 @@
           number: row.querySelector('.player-number').value.trim(),
           name: row.querySelector('.player-name').value.trim(),
           points: Math.max(0, Number(row.querySelector('.player-points').value) || 0),
-          fouls: Math.max(0, Number(row.querySelector('.player-fouls').value) || 0)
+          fouls: Math.max(0, Number(row.querySelector('.player-fouls').value) || 0),
+          onePoint: Math.max(0, Number(row.querySelector('.player-one-point').value) || 0),
+          twoPoint: Math.max(0, Number(row.querySelector('.player-two-point').value) || 0),
+          threePoint: Math.max(0, Number(row.querySelector('.player-three-point').value) || 0)
         })).filter((player) => player.number || player.name);
       }
 
@@ -137,6 +148,7 @@
         const team = {
           id: selectedTeamId || undefined,
           name,
+          shortName: document.getElementById('teamShortName').value.trim(),
           color: document.getElementById('teamColor').value,
           logo: document.getElementById('teamLogo').value.trim(),
           players: collectPlayers()

@@ -35,7 +35,7 @@
 
       function showAnnouncement(p) {
         // p: {team, playerNumber, type, duration}
-        const teamLabel = (p.team === 'home') ? (window.__state?.home?.name || 'HOME') : (window.__state?.away?.name || 'AWAY');
+        const teamLabel = (p.team === 'home') ? (window.__state?.home?.shortName || window.__state?.home?.name || 'HOME') : (window.__state?.away?.shortName || window.__state?.away?.name || 'AWAY');
         foulMain.textContent = `${teamLabel}${p.playerNumber ? ' #' + p.playerNumber : ''}`;
         foulSub.textContent = p.type || '';
         foulType.textContent = (p.type || '').toUpperCase();

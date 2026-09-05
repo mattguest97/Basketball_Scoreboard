@@ -57,6 +57,7 @@
         .team-panel .live-summary { border-left-width:0; }
         .team-panel .panel-action { display:none; }
         .panel:nth-child(4), .panel:nth-child(5), .panel:nth-child(6), .panel:nth-child(7) { display:none; }
+        .desktop-only { display:none !important; }
         .panel.foul-announcement { display:block; grid-column:1 / -1; }
         .foul-announcement-controls { gap:8px; }
         .foul-announcement-controls input, .foul-announcement-controls select { width:100% !important; min-height:38px; }
@@ -247,7 +248,47 @@
         </div>
         <a href="/tipoff" id="tipoffLink" target="_blank">Open Tip-off Overlay</a>
       </div>
+      <div class="panel desktop-only">
+        <h3>PlayHQ Live Data</h3>
+        <div class="lineup-help">Poll a public PlayHQ game-centre link every 10 seconds.</div>
+        <div>
+          <input id="playHqUrl" placeholder="https://www.playhq.com/.../game-centre/..." style="width:100%" />
+        </div>
+        <div style="margin-top:6px">
+          <label><input id="playHqEnabled" type="checkbox" /> Enable live polling</label>
+          <button class="btn" onclick="savePlayHqFeed()">Apply Feed</button>
+        </div>
+        <div id="playHqStatus" class="lineup-help">Not connected</div>
+      </div>
       <div class="panel">
+        <h3>Player Statistics Bar</h3>
+        <div class="lineup-help">Show current and advanced statistics for a player from the live feed.</div>
+        <div class="foul-announcement-controls">
+          <div>
+            <label>Team:
+              <select id="playerStatsTeam">
+                <option value="home">Home</option>
+                <option value="away">Away</option>
+              </select>
+            </label>
+          </div>
+          <div>
+            <label>Player #:
+              <input id="playerStatsNumber" input type="number" style="width:80px" />
+            </label>
+          </div>
+          <div>
+            <label>Duration (sec):
+              <input id="playerStatsDuration" type="number" value="15" min="1" max="30" style="width:80px" />
+            </label>
+          </div>
+          <div>
+            <button class="btn" onclick="showPlayerStats()">Show Statistics</button>
+          </div>
+        </div>
+        <div style="margin-top:8px;font-size:13px;color:#666">Also view at <a href="/player-stats" target="_blank">/player-stats</a></div>
+      </div>
+      <div class="panel desktop-only">
         <h3>Stats Control (FIBA example)</h3>
         <div>
           <label>Payload (JSON):</label><br/>
@@ -303,12 +344,17 @@
         document.getElementById('tipoffSeconds').value = tipoffSeconds % 60;
         if (state.tipoffTitle) document.getElementById('tipoffTitle').value = state.tipoffTitle;
         document.getElementById('tipoffShowScore').checked = state.tipoffShowScore !== false;
+        document.getElementById('playHqUrl').value = state.liveFeed?.url || '';
+        document.getElementById('playHqEnabled').checked = !!state.liveFeed?.enabled;
+        const feedStatus = state.liveFeed?.error ? `Error: ${state.liveFeed.error}` : state.liveFeed?.enabled ? `Polling every 10 seconds${state.liveFeed.lastUpdated ? `; updated ${state.liveFeed.lastUpdated}` : ''}` : 'Not connected';
+        document.getElementById('playHqStatus').textContent = feedStatus;
         if (!lineupInitialised) {
           document.getElementById('homeLineupInput').value = lineupText(state.home.lineup);
           document.getElementById('awayLineupInput').value = lineupText(state.away.lineup);
           lineupInitialised = true;
         }
       });
+      socket.on('playerStatsError', (message) => teamLibraryStatus(message));
 
       function formatClock(seconds) {
         const safeSeconds = Math.max(0, Number(seconds) || 0);
@@ -318,13 +364,13 @@
       }
 
       function lineupText(lineup) {
-        return (lineup || []).map((player) => `${player.number} | ${player.name} | ${player.points} | ${player.fouls || 0}`).join('\n');
+        return (lineup || []).map((player) => `${player.number} | ${player.name} | ${player.points} | ${player.fouls || 0} | ${player.onePoint || 0} | ${player.twoPoint || 0} | ${player.threePoint || 0}`).join('\n');
       }
 
       function parseLineup(value) {
         return value.split('\n').map((line) => {
           const parts = line.split('|').map((part) => part.trim());
-          return { number: parts[0] || '', name: parts[1] || '', points: Math.max(0, Number(parts[2]) || 0), fouls: Math.max(0, Number(parts[3]) || 0) };
+          return { number: parts[0] || '', name: parts[1] || '', points: Math.max(0, Number(parts[2]) || 0), fouls: Math.max(0, Number(parts[3]) || 0), onePoint: Math.max(0, Number(parts[4]) || 0), twoPoint: Math.max(0, Number(parts[5]) || 0), threePoint: Math.max(0, Number(parts[6]) || 0) };
         }).filter((player) => player.number || player.name);
       }
 
@@ -413,7 +459,7 @@
         const side = document.getElementById('savedTeamSide').value;
         setTeamInputs(side, selected);
         const teamPatch = {};
-        teamPatch[side] = { name: selected.name, color: selected.color, logo: selected.logo || '' };
+        teamPatch[side] = { teamId: selected.id, name: selected.name, shortName: selected.shortName || '', color: selected.color, logo: selected.logo || '' };
         socket.emit('control', teamPatch);
         const lineupPatch = { lineup: {} };
         lineupPatch.lineup[side] = selected.players || [];
@@ -468,6 +514,19 @@
         const minutes = Math.max(0, Number(document.getElementById('tipoffMinutes').value) || 0);
         const seconds = Math.max(0, Math.min(59, Number(document.getElementById('tipoffSeconds').value) || 0));
         socket.emit('tipoff', { action: 'set', value: minutes * 60 + seconds });
+      }
+      function savePlayHqFeed() {
+        socket.emit('playHqFeed', {
+          url: document.getElementById('playHqUrl').value.trim(),
+          enabled: document.getElementById('playHqEnabled').checked
+        });
+      }
+      function showPlayerStats() {
+        socket.emit('showPlayerStats', {
+          team: document.getElementById('playerStatsTeam').value,
+          playerNumber: document.getElementById('playerStatsNumber').value.trim(),
+          duration: document.getElementById('playerStatsDuration').value
+        });
       }
       function setClock() {
         const v = document.getElementById('clockInput').value;

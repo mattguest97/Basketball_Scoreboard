@@ -68,8 +68,8 @@
       }
 
       socket.on('state', (state) => {
-        document.getElementById('homeName').textContent = state.home.name || 'Home';
-        document.getElementById('awayName').textContent = state.away.name || 'Away';
+        document.getElementById('homeName').textContent = state.home.shortName || state.home.name || 'Home';
+        document.getElementById('awayName').textContent = state.away.shortName || state.away.name || 'Away';
         document.getElementById('homeScore').textContent = Number(state.home.score) || 0;
         document.getElementById('awayScore').textContent = Number(state.away.score) || 0;
         document.querySelector('.tipoff-banner').style.setProperty('--home-color', state.home.color || '#0052cc');

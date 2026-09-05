@@ -64,8 +64,8 @@
       }
       socket.on('state', (s) => {
         document.body.style.fontFamily = s.fontFamily || 'Montserrat, Arial, sans-serif';
-        document.getElementById('homeName').textContent = s.home.name;
-        document.getElementById('awayName').textContent = s.away.name;
+        document.getElementById('homeName').textContent = s.home.shortName || s.home.name;
+        document.getElementById('awayName').textContent = s.away.shortName || s.away.name;
         document.getElementById('homeScore').textContent = s.home.score;
         document.getElementById('awayScore').textContent = s.away.score;
         document.getElementById('homeFoulsSmall').textContent = s.home.fouls;
@@ -97,7 +97,7 @@
       window.__state = null;
       socket.on('state', (s) => { window.__state = s; });
       socket.on('announceFoul', (p) => {
-        const teamLabel = (p.team === 'home') ? (window.__state?.home?.name || 'HOME') : (window.__state?.away?.name || 'AWAY');
+        const teamLabel = (p.team === 'home') ? (window.__state?.home?.shortName || window.__state?.home?.name || 'HOME') : (window.__state?.away?.shortName || window.__state?.away?.name || 'AWAY');
         foulMainEl.textContent = `${teamLabel} #${p.playerNumber || ''}`;
         foulSubEl.textContent = p.type || '';
         foulTypeEl.textContent = (p.type || '').toUpperCase();

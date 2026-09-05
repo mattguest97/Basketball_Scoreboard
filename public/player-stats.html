@@ -1,0 +1,56 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Player Statistics</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <style>
+      body { background: transparent; overflow: hidden; }
+      .stats-wrap { position: fixed; inset: 0; display: flex; align-items: flex-end; justify-content: center; padding: 3vh 4vw; pointer-events: none; }
+      .stats-bar { width: min(100%, 1100px); padding: 1rem 1.4rem; border-left: .5rem solid var(--team-color, #0052cc); color: #fff; background: rgba(7,12,18,.94); border-radius: 8px; box-shadow: 0 10px 36px rgba(0,0,0,.45); opacity: 0; transform: translateY(1rem); transition: opacity 250ms ease, transform 250ms ease; }
+      .stats-bar.show { opacity: 1; transform: translateY(0); }
+      .stats-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
+      .stats-player { font: 700 clamp(1.4rem,3vw,2.6rem)/1 Oswald, sans-serif; text-transform:uppercase; }
+      .stats-team { color: rgba(255,255,255,.7); font-size: clamp(.9rem,1.5vw,1.2rem); }
+      .stats-values { display: flex; flex-wrap: wrap; gap: .8rem 1.4rem; margin-top: .7rem; font: 700 clamp(.85rem,1.4vw,1.2rem)/1 Orbitron, monospace; }
+      .stats-values span { white-space: nowrap; }
+      .stats-values b { color: #ffb347; }
+    </style>
+  </head>
+  <body>
+    <main class="stats-wrap">
+      <section id="statsBar" class="stats-bar" aria-live="polite">
+        <div class="stats-heading"><strong id="statsPlayer" class="stats-player"></strong><span id="statsTeam" class="stats-team"></span></div>
+        <div id="statsValues" class="stats-values"></div>
+      </section>
+    </main>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+      const socket = io();
+      const bar = document.getElementById('statsBar');
+      let hideTimer = null;
+      function escapeHtml(value) {
+        return String(value || '').replace(/[&<>'"]/g, (character) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' }[character]));
+      }
+
+      socket.on('playerStatsAnnouncement', (announcement) => {
+        const player = announcement.player || {};
+        document.documentElement.style.setProperty('--team-color', announcement.teamColor || '#0052cc');
+        document.getElementById('statsPlayer').textContent = `#${player.number || ''} ${player.name || 'Player'}`;
+        document.getElementById('statsTeam').textContent = announcement.teamName || '';
+        const values = [
+          `<span>PTS <b>${Number(player.points) || 0}</b></span>`,
+          `<span>FOULS <b>${Number(player.fouls) || 0}</b></span>`,
+          `<span>3PT <b>${Number(player.threePoint) || 0}</b></span>`,
+          `<span>FT <b>${Number(player.onePoint) || 0}</b></span>`
+        ];
+        Object.entries(player.advanced || {}).forEach(([key, value]) => values.push(`<span>${escapeHtml(key).toUpperCase()} <b>${Number(value) || 0}</b></span>`));
+        document.getElementById('statsValues').innerHTML = values.join('');
+        bar.classList.add('show');
+        clearTimeout(hideTimer);
+        hideTimer = setTimeout(() => bar.classList.remove('show'), (Number(announcement.duration) || 8) * 1000);
+      });
+    </script>
+  </body>
+</html>

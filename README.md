@@ -19,6 +19,7 @@ A browser-based basketball scoreboard for Portsmouth Force. The control panel up
 - Configurable team names, colours, logos, fonts, and player line-ups.
 - Saved team profiles in `teams.json`, manageable from the control panel.
 - Transparent tip-off, line-up, and foul announcement overlays for production use.
+- Optional PlayHQ live game polling every 10 seconds with player advanced statistics.
 - FIBA Live Stats preview with a shot map, team statistics, and player statistics.
 - Browser-based control panel with no database or build step required.
 
@@ -54,6 +55,7 @@ All pages are served from `public/` by the Express static-file server.
 | `/lineup` | Line-up overlay; use `?team=home`, `?team=away`, or `?pregame=1` |
 | `/foul` | Foul announcement overlay |
 | `/stats` | FIBA Live Stats preview viewer |
+| `/player-stats` | Short player statistics bar overlay |
 | `/api/teams` | List, save, and delete saved team profiles |
 | `POST /api/fiba` | Broadcast a JSON stats payload to connected stats viewers - currently defective|
 

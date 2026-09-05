@@ -1,5 +1,6 @@
 const express = require('express');
 const http = require('http');
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const app = express();
@@ -7,11 +8,30 @@ const server = http.createServer(app);
 const { Server } = require('socket.io');
 const io = new Server(server);
 const teamsFile = path.join(__dirname, 'teams.json');
+const playHqGraphqlUrl = 'https://api.euprod.playhq.com/graphql';
+const playHqQuery = `
+  query LiveGame($gameId: ID!) {
+    discoverGame(gameID: $gameId) {
+      id
+      home { ... on DiscoverTeam { name } ... on ProvisionalTeam { name } }
+      away { ... on DiscoverTeam { name } ... on ProvisionalTeam { name } }
+      result { home { score } away { score } }
+      statistics {
+        home { players { playerNumber player { ... on DiscoverParticipant { profile { firstName lastName } } ... on DiscoverParticipantFillInPlayer { profile { firstName lastName } } ... on DiscoverGamePermitFillInPlayer { profile { firstName lastName } } ... on DiscoverRegularFillInPlayer { name } ... on DiscoverAnonymousParticipant { name } } statistics { count type { value shortName label } } periodStatistics { type statistics { type { value label shortName advanced } count details { value } } } } }
+        away { players { playerNumber player { ... on DiscoverParticipant { profile { firstName lastName } } ... on DiscoverParticipantFillInPlayer { profile { firstName lastName } } ... on DiscoverGamePermitFillInPlayer { profile { firstName lastName } } ... on DiscoverRegularFillInPlayer { name } ... on DiscoverAnonymousParticipant { name } } statistics { count type { value shortName label } } periodStatistics { type statistics { type { value label shortName advanced } count details { value } } } } }
+      }
+    }
+  }`;
+let liveFeedTimer = null;
+let liveFeedConfig = { url: '', enabled: false, lastUpdated: null, error: '' };
 
 function readTeams() {
   try {
     const data = JSON.parse(fs.readFileSync(teamsFile, 'utf8'));
-    return Array.isArray(data.teams) ? data.teams : [];
+    return Array.isArray(data.teams) ? data.teams.map((team) => ({
+      ...team,
+      players: Array.isArray(team.players) ? team.players.filter((player) => !isPrivatePlayerName(player.name)) : []
+    })) : [];
   } catch (error) {
     return [];
   }
@@ -25,18 +45,153 @@ function teamIdFor(name) {
   return String(name).toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'team';
 }
 
+function isPrivatePlayerName(name) {
+  return /private\s+player|anonymous\s+player/i.test(String(name || '').trim());
+}
+
 function normaliseTeam(team) {
   const name = String(team.name || '').trim().slice(0, 80);
+  const shortName = String(team.shortName || '').trim().slice(0, 40);
   const color = String(team.color || '').trim();
   const logo = typeof team.logo === 'string' ? team.logo.slice(0, 700000) : '';
   const players = Array.isArray(team.players) ? team.players.slice(0, 15).map((player) => ({
     number: String(player.number || '').trim().slice(0, 5),
     name: String(player.name || '').trim().slice(0, 80),
     points: Math.max(0, Number(player.points) || 0),
-    fouls: Math.max(0, Number(player.fouls) || 0)
-  })).filter((player) => player.number || player.name) : [];
+    fouls: Math.max(0, Number(player.fouls) || 0),
+    onePoint: Math.max(0, Number(player.onePoint) || 0),
+    twoPoint: Math.max(0, Number(player.twoPoint) || 0),
+    threePoint: Math.max(0, Number(player.threePoint) || 0)
+  })).filter((player) => (player.number || player.name) && !isPrivatePlayerName(player.name)) : [];
   if (!name || !/^#[0-9a-f]{6}$/i.test(color)) return null;
-  return { id: String(team.id || ''), name, color, logo, players };
+  return { id: String(team.id || ''), name, shortName, color, logo, players };
+}
+
+function gameIdFromUrl(url) {
+  try {
+    const parsed = new URL(url);
+    const parts = parsed.pathname.split('/').filter(Boolean);
+    return parts[parts.length - 1] || '';
+  } catch (error) {
+    return '';
+  }
+}
+
+function valueForStatistic(statistics, names) {
+  const match = (statistics || []).find((statistic) => {
+    const type = statistic.type || {};
+    return [type.value, type.shortName, type.label].some((value) => names.includes(String(value || '').toUpperCase()));
+  });
+  return match ? Number(match.count) || 0 : 0;
+}
+
+function playerName(player) {
+  if (!player) return 'Unknown Player';
+  if (player.name) return player.name;
+  const profile = player.profile || {};
+  return [profile.firstName, profile.lastName].filter(Boolean).join(' ') || 'Unknown Player';
+}
+
+function normaliseLivePlayer(player) {
+  const name = playerName(player.player);
+  if (isPrivatePlayerName(name)) return null;
+  const advanced = {};
+  const periodStatistics = (player.periodStatistics || []).flatMap((period) => period.statistics || []);
+  const allStatistics = [...(player.statistics || []), ...periodStatistics];
+  (player.periodStatistics || []).forEach((period) => {
+    (period.statistics || []).forEach((statistic) => {
+      const key = statistic.type?.shortName || statistic.type?.label || statistic.type?.value;
+      if (key) advanced[key] = Number(statistic.count) || 0;
+    });
+  });
+  return {
+    number: String(player.playerNumber || ''),
+    name,
+    points: Number(player.playerPoints) || valueForStatistic(player.statistics, ['POINTS', 'PTS', 'TOTAL_POINTS', 'TOTAL_SCORE']),
+    fouls: valueForStatistic(allStatistics, ['F', 'PF', 'TOTAL_FOULS', 'FOULS', 'FOUL', 'PERSONAL_FOULS', 'PERSONAL FOULS']),
+    onePoint: valueForStatistic(allStatistics, ['1_POINT_SCORE', 'ONE_POINT_SCORE']),
+    twoPoint: valueForStatistic(allStatistics, ['2_POINT_SCORE', 'TWO_POINT_SCORE']),
+    threePoint: valueForStatistic(allStatistics, ['3_POINT_SCORE', 'THREE_POINT_SCORE']),
+    advanced
+  };
+}
+
+function persistLivePlayers(side, players) {
+  const teamId = state[side].teamId;
+  if (!teamId) return;
+  const teams = readTeams();
+  const index = teams.findIndex((team) => team.id === teamId);
+  if (index < 0) return;
+  const nextPlayers = players.slice(0, 15).map((player) => ({
+    number: String(player.number || ''),
+    name: String(player.name || ''),
+    points: Math.max(0, Number(player.points) || 0),
+    fouls: Math.max(0, Number(player.fouls) || 0),
+    onePoint: Math.max(0, Number(player.onePoint) || 0),
+    twoPoint: Math.max(0, Number(player.twoPoint) || 0),
+    threePoint: Math.max(0, Number(player.threePoint) || 0)
+  })).filter((player) => player.number || player.name);
+  if (JSON.stringify(teams[index].players || []) === JSON.stringify(nextPlayers)) return;
+  teams[index] = { ...teams[index], players: nextPlayers };
+  writeTeams(teams);
+}
+
+function teamScore(teamStatistics) {
+  return valueForStatistic(teamStatistics?.statisticsV2 || teamStatistics?.statistics, ['POINTS', 'PTS', 'TOTAL_POINTS', 'SCORE']);
+}
+
+async function pollPlayHq() {
+  const gameId = gameIdFromUrl(liveFeedConfig.url);
+  if (!liveFeedConfig.enabled || !gameId) return;
+  try {
+    const response = await fetch(playHqGraphqlUrl, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        accept: '*/*',
+        tenant: 'basketball-england',
+        origin: 'https://www.playhq.com',
+        referer: 'https://www.playhq.com/',
+        'request-id': crypto.randomUUID(),
+        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.135.0 Chrome/148.0.7778.280 Electron/42.8.1 Safari/537.36'
+      },
+      body: JSON.stringify({ operationName: 'LiveGame', query: playHqQuery, variables: { gameId } })
+    });
+    if (!response.ok) throw new Error(`PlayHQ returned HTTP ${response.status}`);
+    const payload = await response.json();
+    if (payload.errors?.length) throw new Error(payload.errors[0].message || 'PlayHQ query failed');
+    const game = payload.data?.discoverGame;
+    if (!game) throw new Error('PlayHQ returned no game data');
+
+    const liveTeams = {
+      home: (game.statistics?.home?.players || []).map(normaliseLivePlayer).filter(Boolean),
+      away: (game.statistics?.away?.players || []).map(normaliseLivePlayer).filter(Boolean)
+    };
+    for (const side of ['home', 'away']) {
+      const players = liveTeams[side];
+      state[side].lineup = players;
+      persistLivePlayers(side, players);
+    }
+    state.liveStats = { source: 'playhq', updatedAt: new Date().toISOString(), home: liveTeams.home, away: liveTeams.away };
+    liveFeedConfig.lastUpdated = state.liveStats.updatedAt;
+    liveFeedConfig.error = '';
+    io.emit('state', state);
+  } catch (error) {
+    liveFeedConfig.error = error.message;
+    io.emit('state', state);
+  }
+}
+
+function configureLiveFeed(url, enabled) {
+  liveFeedConfig = {
+    ...liveFeedConfig,
+    url: String(url || '').trim(),
+    enabled: !!enabled,
+    error: ''
+  };
+  if (liveFeedTimer) clearInterval(liveFeedTimer);
+  liveFeedTimer = liveFeedConfig.enabled ? setInterval(pollPlayHq, 10000) : null;
+  if (liveFeedConfig.enabled) pollPlayHq();
 }
 
 app.use(express.static(path.join(__dirname, 'public')));
@@ -48,7 +203,8 @@ const pageAliases = {
   '/tipoff': 'tipoff.html',
   '/lineup': 'lineup.html',
   '/foul': 'foul.html',
-  '/stats': 'stats.html'
+  '/stats': 'stats.html',
+  '/player-stats': 'player-stats.html'
 };
 Object.entries(pageAliases).forEach(([route, file]) => {
   app.get(route, (req, res) => res.sendFile(path.join(__dirname, 'public', file)));
@@ -99,6 +255,8 @@ app.post('/api/fiba', (req, res) => {
 let state = {
   home: {
     name: 'Home',
+    teamId: '',
+    shortName: '',
     logo: '',
     color: '#0052cc',
     score: 0,
@@ -108,6 +266,8 @@ let state = {
   },
   away: {
     name: 'Away',
+    teamId: '',
+    shortName: '',
     logo: '',
     color: '#cc0000',
     score: 0,
@@ -123,9 +283,22 @@ let state = {
   tipoffRunning: false,
   tipoffTitle: 'Time to Tip Off',
   tipoffShowScore: true,
+  liveFeed: liveFeedConfig,
+  liveStats: null,
   fontFamily: 'Arial, sans-serif',
   bonus: { home: false, away: false }
 };
+
+const savedTeamProfiles = readTeams();
+for (const [side, profile] of [['home', savedTeamProfiles[0]], ['away', savedTeamProfiles[1]]]) {
+  if (!profile) continue;
+  state[side].name = profile.name || state[side].name;
+  state[side].teamId = profile.id || '';
+  state[side].shortName = profile.shortName || '';
+  state[side].logo = profile.logo || '';
+  state[side].color = profile.color || state[side].color;
+  state[side].lineup = Array.isArray(profile.players) ? profile.players : [];
+}
 
 let clockTimer = null;
 
@@ -169,7 +342,10 @@ io.on('connection', (socket) => {
           number: String(player.number || ''),
           name: String(player.name || ''),
           points: Math.max(0, Number(player.points) || 0),
-          fouls: Math.max(0, Number(player.fouls) || 0)
+          fouls: Math.max(0, Number(player.fouls) || 0),
+          onePoint: Math.max(0, Number(player.onePoint) || 0),
+          twoPoint: Math.max(0, Number(player.twoPoint) || 0),
+          threePoint: Math.max(0, Number(player.threePoint) || 0)
         })).filter((player) => player.name || player.number);
       }
     }
@@ -192,6 +368,19 @@ io.on('connection', (socket) => {
     }
 
     updateBonusFlags();
+    io.emit('state', state);
+  });
+
+  socket.on('playHqFeed', ({ url, enabled }) => {
+    const gameId = gameIdFromUrl(url);
+    if (enabled && !gameId) {
+      liveFeedConfig.error = 'Enter a valid PlayHQ game-centre URL.';
+      state.liveFeed = liveFeedConfig;
+      io.emit('state', state);
+      return;
+    }
+    configureLiveFeed(url, enabled);
+    state.liveFeed = liveFeedConfig;
     io.emit('state', state);
   });
 
@@ -293,6 +482,24 @@ io.on('connection', (socket) => {
   socket.on('announceFoul', (payload) => {
     // payload: { team: 'home'|'away', playerNumber: '23', type: 'Personal', duration: 5 }
     io.emit('announceFoul', payload);
+  });
+
+  socket.on('showPlayerStats', ({ team, playerNumber, duration }) => {
+    if (!['home', 'away'].includes(team)) return;
+    const number = String(playerNumber || '').trim();
+    const livePlayers = state.liveStats?.[team] || [];
+    const player = livePlayers.find((entry) => String(entry.number) === number) || state[team].lineup.find((entry) => String(entry.number) === number);
+    if (!player) {
+      socket.emit('playerStatsError', `No live statistics found for ${state[team].shortName || state[team].name} #${number}.`);
+      return;
+    }
+    io.emit('playerStatsAnnouncement', {
+      team,
+      teamName: state[team].shortName || state[team].name,
+      teamColor: state[team].color,
+      player,
+      duration: Math.max(1, Math.min(30, Number(duration) || 8))
+    });
   });
 });
 
