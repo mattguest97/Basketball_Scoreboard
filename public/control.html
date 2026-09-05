@@ -1,0 +1,445 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Scoreboard Control</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <style>
+      /* keep control page scrollable and responsive */
+      body { padding: 12px; overflow:auto }
+      .controls { display:flex; gap:16px; flex-wrap:wrap; align-items:flex-start }
+      .panel { padding:12px; border:1px solid #ddd; border-radius:6px; background:#fff; flex:1 1 320px; min-width:240px }
+      .btn { padding:8px 12px; margin:4px; cursor:pointer }
+      .live-summary { display:flex; gap:18px; margin:12px 0; padding:10px 12px; background:#f3f5f7; border-left:4px solid #0052cc; }
+      .live-summary strong { display:block; font-size:1.5rem; color:#20252b}
+      .live-summary span { color:#555; font-size:12px; text-transform:uppercase; }
+      .timer-status { display:flex; align-items:baseline; justify-content:space-between; margin:0 0 8px; padding:8px 10px; background:#20252b; color:#fff; border-radius:4px; }
+      .timer-display { font:700 1.8rem/1 Orbitron, monospace; letter-spacing:1px; }
+      .timer-state { color:#b9c2cc; font-size:12px; text-transform:uppercase; }
+      .lineup-input { width:100%; height:130px; resize:vertical; font-family:monospace; }
+      .lineup-help { color:#666; font-size:12px; margin:4px 0; }
+      .tipoff-controls { display:flex; flex-wrap:wrap; align-items:center; gap:4px; }
+      .advanced-control { display:block; }
+      .score-controls { display:grid; grid-template-columns:repeat(4, 1fr); gap:4px; }
+      .foul-controls { display:flex; gap:4px; }
+      .timer-controls { display:flex; gap:4px; }
+      .foul-announcement-controls { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+      .foul-announcement-controls > div:last-child { grid-column:1 / -1; }
+
+      /* phone layout keeps the live game controls in the first viewport */
+      @media (max-width:720px){
+        body { padding:6px; background:#f5f6f7 }
+        h1 { font-size:1.2rem; margin:0 0 6px }
+        .controls { display:grid; grid-template-columns:1fr 1fr; gap:6px }
+        .panel { min-width:0; width:auto; padding:7px; border-radius:4px }
+        .panel h3 { font-size:1rem; margin:0 0 5px }
+        .live-summary { gap:12px; margin:0 0 6px; padding:5px 7px }
+        .live-summary strong { font-size:1.25rem; line-height:1.1 }
+        .live-summary span { font-size:10px }
+        input, textarea, select { max-width:100%; font-size:12px; padding:3px }
+        input[type="file"] { width:100%; padding:0; font-size:10px }
+        input[type="color"] { width:32px; height:24px; padding:0 }
+        label { font-size:11px }
+        .btn { padding:3px 4px; margin:2px 1px; font-size:12px; margin:1em; }
+        .score-controls { gap:7px; }
+        .score-controls .btn { min-height:40px; margin:0; font-size:1.35rem; font-weight:700; }
+        .score-controls .btn:first-child { background:#16803c; color:#fff; }
+        .score-controls .btn:nth-child(2) { background:#1f6feb; color:#fff; }
+        .score-controls .btn:nth-child(3) { background:#e09f18; color:#fff; }
+        .score-controls .btn:last-child { background:#6b7280; color:#fff; }
+        .foul-controls { gap:7px; }
+        .foul-controls .btn { flex:1; min-height:42px; margin:1em; }
+        .timer-controls { display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; }
+        .timer-controls .btn { min-height:52px; margin:0; padding:6px 4px; font-size:11px; }
+        .team-panel .advanced-control { display:none; }
+        .team-panel .live-summary { border-left-width:0; }
+        .team-panel .panel-action { display:none; }
+        .panel:nth-child(4), .panel:nth-child(5), .panel:nth-child(6), .panel:nth-child(7) { display:none; }
+        .panel.foul-announcement { display:block; grid-column:1 / -1; }
+        .foul-announcement-controls { gap:8px; }
+        .foul-announcement-controls input, .foul-announcement-controls select { width:100% !important; min-height:38px; }
+        .foul-announcement-controls > div:last-child, .foul-announcement-controls .btn { width:100%; min-height:48px; margin:0; font-weight:700; }
+        .panel:nth-child(3) { grid-column:1 / -1 }
+        .panel:nth-child(4), .panel:nth-child(5) { grid-column:auto }
+        .panel:nth-child(4) > div, .panel:nth-child(5) > div, .panel:nth-child(6) > div { margin-top:4px !important }
+        .panel:nth-child(5), .panel:nth-child(6) { grid-column:1 / -1 }
+        textarea { height:80px !important }
+      }
+    </style>
+  </head>
+  <body>
+    
+    <div class="controls">
+      <div class="panel">
+        <h3>Home Team</h3>
+        <div class="live-summary" id="homeLiveSummary">
+          <div><span>Score</span><strong id="homeCurrentScore">0</strong></div>
+          <div><span>Fouls</span><strong id="homeCurrentFouls">0</strong></div>
+        </div>
+        <div class="advanced-control">
+          <input id="homeNameInput" placeholder="Team name" /><br/>
+          <label>Logo: <input id="homeLogoFile" type="file" accept="image/*" onchange="handleLogoFile('home', this)" /></label>
+          <div><input id="homeLogoInput" placeholder="Or paste Logo URL" style="width:70%" /></div>
+          <div id="homeLogoPreview" style="margin-top:6px;font-size:13px;color:#333"></div>
+          <input id="homeColorInput" type="color" value="#0052cc" />
+        </div>
+        <div class="score-controls">
+          <button class="btn" onclick="inc('home',3)">+3</button>
+          <button class="btn" onclick="inc('home',2)">+2</button>
+          <button class="btn" onclick="inc('home',1)">+1</button>
+          <button class="btn" onclick="inc('home',-1)">-1</button>
+        </div>
+        <div class="foul-controls">
+          <button class="btn" onclick="foul('home',1)">Foul +</button>
+          <button class="btn" onclick="foul('home',-1)">Foul -</button>
+        </div>
+        <div class="panel-action">
+          <button class="btn" onclick="timeout('home')">Timeout</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>Away Team</h3>
+        <div class="live-summary" id="awayLiveSummary" style="border-left-color:#cc0000">
+          <div><span>Score</span><strong id="awayCurrentScore">0</strong></div>
+          <div><span>Fouls</span><strong id="awayCurrentFouls">0</strong></div>
+        </div>
+        <div class="advanced-control">
+          <input id="awayNameInput" placeholder="Team name" /><br/>
+          <label>Logo: <input id="awayLogoFile" type="file" accept="image/*" onchange="handleLogoFile('away', this)" /></label>
+          <div><input id="awayLogoInput" placeholder="Or paste Logo URL" style="width:70%" /></div>
+          <div id="awayLogoPreview" style="margin-top:6px;font-size:13px;color:#333"></div>
+          <input id="awayColorInput" type="color" value="#cc0000" />
+        </div>
+        <div class="score-controls">
+          <button class="btn" onclick="inc('away',3)">+3</button>
+          <button class="btn" onclick="inc('away',2)">+2</button>
+          <button class="btn" onclick="inc('away',1)">+1</button>
+          <button class="btn" onclick="inc('away',-1)">-1</button>
+        </div>
+        <div class="foul-controls">
+          <button class="btn" onclick="foul('away',1)">Foul +</button>
+          <button class="btn" onclick="foul('away',-1)">Foul -</button>
+        </div>
+        <div class="panel-action">
+          <button class="btn" onclick="timeout('away')">Timeout</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>Clock & Period</h3>
+        <div class="timer-status" aria-live="polite">
+          <strong id="timerDisplay" class="timer-display">10:00</strong>
+          <span id="timerState" class="timer-state">Stopped</span>
+        </div>
+        <div>
+          <label>Quarter: <input id="quarterInput" type="number" value="1" min="1" max="4"/></label>
+          <button class="btn" onclick="setQuarter()">Set</button>
+        </div>
+        <div>
+          <label>Clock (MM:SS): <input id="clockInput" placeholder="MM:SS" /></label>
+          <button class="btn" onclick="setClock()">Set</button>
+        </div>
+        <div class="timer-controls">
+          <button id="startTimerBtn" class="btn" onclick="clockAction('start')">Start Timer</button>
+          <button id="stopTimerBtn" class="btn" onclick="clockAction('pause')">Stop Timer</button>
+          <button class="btn" onclick="clockAction('reset')">Reset Timer</button>
+        </div>
+        <div>
+          <label>Font: 
+            <select id="fontSelect" onchange="fontSelectChanged()">
+              <option value="Montserrat, Arial, sans-serif">Default (Montserrat)</option>
+              <option value="Oswald, Arial, sans-serif">Oswald (score)</option>
+              <option value="Roboto, Arial, sans-serif">Roboto</option>
+              <option value="Poppins, Arial, sans-serif">Poppins</option>
+              <option value="Arial, sans-serif">Arial (system)</option>
+              <option value="custom">Custom...</option>
+            </select>
+          </label>
+          <div id="fontCustomWrap" style="display:none;margin-top:6px">
+            <input id="fontCustomInput" placeholder="e.g. 'My Font', Arial, sans-serif" style="width:90%" />
+          </div>
+        </div>
+        <div>
+          <button class="btn" onclick="applySettings()">Apply Settings</button>
+          <button class="btn" onclick="resetAll()">Reset Game</button>
+        </div>
+      </div>
+
+      <div class="panel foul-announcement">
+        <h3>Foul Announcement</h3>
+        <div class="foul-announcement-controls">
+          <div>
+          <label>Team:
+            <select id="announceTeam">
+              <option value="home">Home</option>
+              <option value="away">Away</option>
+            </select>
+          </label>
+          </div>
+          <div>
+          <label>Player #: <input id="announcePlayer" placeholder="23" style="width:80px"/></label>
+          </div>
+          <div>
+          <label>Type:
+            <select id="announceType">
+              <option>Personal</option>
+              <option>Technical</option>
+              <option>Unsportsmanlike</option>
+              <option>Disqualifying</option>
+            </select>
+          </label>
+          </div>
+          <div>
+          <label>Duration (sec): <input id="announceDuration" type="number" value="4" min="1" style="width:80px"/></label>
+          </div>
+          <div>
+            <button class="btn" onclick="announceFoul()">Show Announcement</button>
+          </div>
+        </div>
+        <div style="margin-top:8px;font-size:13px;color:#666">Also view at <a href="/foul.html" target="_blank">/foul.html</a></div>
+      </div>
+      <div class="panel">
+        <h3>Team Line-up</h3>
+        <div class="lineup-help">One player per line: number | name | points | personal fouls</div>
+        <label>Home</label>
+        <textarea id="homeLineupInput" class="lineup-input" placeholder="4 | Player Name | 0 | 0"></textarea>
+        <label>Away</label>
+        <textarea id="awayLineupInput" class="lineup-input" placeholder="4 | Player Name | 0 | 0"></textarea>
+        <button class="btn" onclick="saveLineup()">Save Line-up</button>
+        <a href="/lineup.html" target="_blank">Open Line-up Overlay</a>
+        <div><a href="/lineup.html?team=home" target="_blank">Home only</a> | <a href="/lineup.html?team=away" target="_blank">Away only</a></div>
+        <div><a href="/lineup.html?pregame=1" target="_blank">Pre-game: both</a> | <a href="/lineup.html?team=home&pregame=1" target="_blank">Home</a> | <a href="/lineup.html?team=away&pregame=1" target="_blank">Away</a></div>
+        <div id="lineupStatus" style="margin-top:4px;color:#666;font-size:12px"></div>
+      </div>
+      <div class="panel">
+        <h3>Tip-off Banner</h3>
+        <div class="lineup-help">Set the remaining time, then start or stop the shared countdown.</div>
+        <div class="tipoff-controls">
+          <label>Minutes: <input id="tipoffMinutes" type="number" min="0" value="30" style="width:70px" /></label>
+          <label>Seconds: <input id="tipoffSeconds" type="number" min="0" max="59" value="0" style="width:60px" /></label>
+          <button class="btn" onclick="setTipoff()">Set Time</button>
+        </div>
+        <div class="tipoff-controls">
+          <button id="startTipoffBtn" class="btn" onclick="tipoffAction('start')">Start Countdown</button>
+          <button id="stopTipoffBtn" class="btn" onclick="tipoffAction('pause')">Stop Countdown</button>
+          <span id="tipoffCurrent" class="lineup-help">30:00 Stopped</span>
+        </div>
+        <a href="/tipoff.html" id="tipoffLink" target="_blank">Open Tip-off Overlay</a>
+      </div>
+      <div class="panel">
+        <h3>Stats Control (FIBA example)</h3>
+        <div>
+          <label>Payload (JSON):</label><br/>
+          <textarea id="fibaPayload" style="width:100%;height:140px;font-family:monospace;font-size:13px">{
+  "teams": [{ "name": "Portsmouth Force", "pts": 72, "fgpct": "48%", "3pt": 8 }],
+  "players": [{ "name": "J. Smith", "number": 7, "pts": 18, "reb": 6, "ast": 4 }],
+  "shots": [{ "x": 0.6, "y": 0.4, "made": true }, { "x": 0.4, "y": 0.7, "made": false }]
+}</textarea>
+        </div>
+        <div style="margin-top:8px">
+          <button class="btn" onclick="sendFibaPayload()">Send to Stats Viewer</button>
+          <button class="btn" onclick="postFibaPayload()">POST /api/fiba</button>
+        </div>
+        <div id="fibaStatus" style="margin-top:8px;color:#333;font-size:13px"></div>
+      </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+      // compute a --scale CSS variable so site-wide rem-based sizing adapts
+      (function(){
+        const setScale = ()=>{
+          const w = Math.max(document.documentElement.clientWidth || 320, 320);
+          // base control layout designed for ~420px width; clamp 0.7-1.0
+          const scale = Math.max(0.7, Math.min(1, w / 420));
+          document.documentElement.style.setProperty('--scale', scale);
+        };
+        window.addEventListener('resize', setScale);
+        setScale();
+      })();
+
+      const socket = io();
+      let homeLogoData = null;
+      let awayLogoData = null;
+      let lineupInitialised = false;
+
+      socket.on('state', (state) => {
+        const tipoffSeconds = Number.isFinite(Number(state.tipoffSeconds)) ? Math.max(0, Number(state.tipoffSeconds)) : 1800;
+        document.getElementById('homeCurrentScore').textContent = state.home.score;
+        document.getElementById('homeCurrentFouls').textContent = state.home.fouls;
+        document.getElementById('awayCurrentScore').textContent = state.away.score;
+        document.getElementById('awayCurrentFouls').textContent = state.away.fouls;
+        document.getElementById('timerDisplay').textContent = formatClock(state.clock);
+        document.getElementById('timerState').textContent = state.running ? 'Running' : (state.clock <= 0 ? 'Finished' : 'Stopped');
+        document.getElementById('startTimerBtn').disabled = state.running;
+        document.getElementById('stopTimerBtn').disabled = !state.running;
+        document.getElementById('quarterInput').value = state.quarter;
+        document.getElementById('tipoffCurrent').textContent = `${formatClock(tipoffSeconds)} ${state.tipoffRunning ? 'Running' : 'Stopped'}`;
+        document.getElementById('startTipoffBtn').disabled = state.tipoffRunning || tipoffSeconds <= 0;
+        document.getElementById('stopTipoffBtn').disabled = !state.tipoffRunning;
+        document.getElementById('tipoffMinutes').value = Math.floor(tipoffSeconds / 60);
+        document.getElementById('tipoffSeconds').value = tipoffSeconds % 60;
+        if (!lineupInitialised) {
+          document.getElementById('homeLineupInput').value = lineupText(state.home.lineup);
+          document.getElementById('awayLineupInput').value = lineupText(state.away.lineup);
+          lineupInitialised = true;
+        }
+      });
+
+      function formatClock(seconds) {
+        const safeSeconds = Math.max(0, Number(seconds) || 0);
+        const minutes = Math.floor(safeSeconds / 60);
+        const remainder = safeSeconds % 60;
+        return `${minutes}:${remainder.toString().padStart(2, '0')}`;
+      }
+
+      function lineupText(lineup) {
+        return (lineup || []).map((player) => `${player.number} | ${player.name} | ${player.points} | ${player.fouls || 0}`).join('\n');
+      }
+
+      function parseLineup(value) {
+        return value.split('\n').map((line) => {
+          const parts = line.split('|').map((part) => part.trim());
+          return { number: parts[0] || '', name: parts[1] || '', points: Math.max(0, Number(parts[2]) || 0), fouls: Math.max(0, Number(parts[3]) || 0) };
+        }).filter((player) => player.number || player.name);
+      }
+
+      function saveLineup() {
+        socket.emit('control', {
+          lineup: {
+            home: parseLineup(document.getElementById('homeLineupInput').value),
+            away: parseLineup(document.getElementById('awayLineupInput').value)
+          }
+        });
+        const status = document.getElementById('lineupStatus');
+        status.textContent = 'Line-up saved';
+        setTimeout(() => { status.textContent = ''; }, 1500);
+      }
+
+      document.getElementById('tipoffMinutes').addEventListener('input', (event) => {
+        const minutes = Math.max(0, Number(event.target.value) || 0);
+        document.getElementById('tipoffLink').href = `/tipoff.html?minutes=${minutes}`;
+      });
+
+      function handleLogoFile(team, input) {
+        const file = input.files && input.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const dataUrl = e.target.result;
+          if (team === 'home') {
+            homeLogoData = dataUrl;
+            document.getElementById('homeLogoPreview').textContent = file.name + ' (local)';
+          } else {
+            awayLogoData = dataUrl;
+            document.getElementById('awayLogoPreview').textContent = file.name + ' (local)';
+          }
+        };
+        reader.readAsDataURL(file);
+      }
+
+      // utility: read a file input as DataURL and return Promise<string|null>
+      function readFileInputDataUrl(inputEl) {
+        return new Promise((resolve) => {
+          if (!inputEl || !inputEl.files || !inputEl.files[0]) return resolve(null);
+          const f = inputEl.files[0];
+          const r = new FileReader();
+          r.onload = (e) => resolve(e.target.result);
+          r.onerror = () => resolve(null);
+          r.readAsDataURL(f);
+        });
+      }
+
+      function inc(team, pts) { socket.emit('increment', {team, points: pts}); }
+      function foul(team, delta) { socket.emit('foul', {team, delta}); }
+      function timeout(team) { socket.emit('timeout', {team}); }
+      function clockAction(act) { socket.emit('clock', { action: act }); }
+      function tipoffAction(action) { socket.emit('tipoff', { action }); }
+      function setTipoff() {
+        const minutes = Math.max(0, Number(document.getElementById('tipoffMinutes').value) || 0);
+        const seconds = Math.max(0, Math.min(59, Number(document.getElementById('tipoffSeconds').value) || 0));
+        socket.emit('tipoff', { action: 'set', value: minutes * 60 + seconds });
+      }
+      function setClock() {
+        const v = document.getElementById('clockInput').value;
+        const parts = v.split(':').map(x=>Number(x.trim()));
+        if (parts.length===2) {
+          const s = parts[0]*60 + parts[1];
+          socket.emit('clock', { action: 'set', value: s });
+        }
+      }
+      function setQuarter(){
+        const q = Number(document.getElementById('quarterInput').value)||1;
+        socket.emit('setQuarter', { quarter: q });
+        socket.emit('control', { resetForQuarter:true, quarter: q });
+      }
+
+      function fontSelectChanged(){
+        const sel = document.getElementById('fontSelect').value;
+        const wrap = document.getElementById('fontCustomWrap');
+        if (sel === 'custom') wrap.style.display = 'block';
+        else wrap.style.display = 'none';
+      }
+
+      async function applySettings(){
+        // ensure file reads complete before sending
+        const homeFileInput = document.getElementById('homeLogoFile');
+        const awayFileInput = document.getElementById('awayLogoFile');
+        const homeFileData = await readFileInputDataUrl(homeFileInput);
+        const awayFileData = await readFileInputDataUrl(awayFileInput);
+
+        const homeLogoUrl = document.getElementById('homeLogoInput').value.trim();
+        const awayLogoUrl = document.getElementById('awayLogoInput').value.trim();
+        const home = {
+          name: document.getElementById('homeNameInput').value || undefined,
+          logo: homeFileData || homeLogoData || (homeLogoUrl || undefined),
+          color: document.getElementById('homeColorInput').value || undefined
+        };
+        const away = {
+          name: document.getElementById('awayNameInput').value || undefined,
+          logo: awayFileData || awayLogoData || (awayLogoUrl || undefined),
+          color: document.getElementById('awayColorInput').value || undefined
+        };
+        let font = document.getElementById('fontSelect').value;
+        if (font === 'custom') font = document.getElementById('fontCustomInput').value || undefined;
+        socket.emit('control', { home, away, fontFamily: font });
+
+        // quick visual confirmation
+        const btn = document.querySelector('button[onclick="applySettings()"]');
+        if (btn) { const old = btn.textContent; btn.textContent = 'Applied'; setTimeout(()=> btn.textContent = old, 900); }
+      }
+      function resetAll(){ socket.emit('reset'); }
+      function announceFoul(){
+        const team = document.getElementById('announceTeam').value;
+        const playerNumber = document.getElementById('announcePlayer').value.trim() || '';
+        const type = document.getElementById('announceType').value;
+        const duration = Number(document.getElementById('announceDuration').value) || 4;
+        socket.emit('announceFoul', { team, playerNumber, type, duration });
+      }
+
+      function sendFibaPayload(){
+        const txt = document.getElementById('fibaPayload').value;
+        let payload = null;
+        try{ payload = JSON.parse(txt); }
+        catch(e){ document.getElementById('fibaStatus').textContent = 'Invalid JSON: ' + e.message; return; }
+        socket.emit('fibaUpdate', payload);
+        document.getElementById('fibaStatus').textContent = 'Sent via Socket.IO';
+        setTimeout(()=> document.getElementById('fibaStatus').textContent = '', 1500);
+      }
+
+      async function postFibaPayload(){
+        const txt = document.getElementById('fibaPayload').value;
+        let payload = null;
+        try{ payload = JSON.parse(txt); } catch(e){ document.getElementById('fibaStatus').textContent = 'Invalid JSON: ' + e.message; return; }
+        try{
+          const res = await fetch('/api/fiba', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+          const j = await res.json();
+          document.getElementById('fibaStatus').textContent = j.ok ? 'Posted to /api/fiba' : 'POST failed';
+        }catch(e){ document.getElementById('fibaStatus').textContent = 'POST error: '+e.message }
+        setTimeout(()=> document.getElementById('fibaStatus').textContent = '', 2000);
+      }
+    </script>
+  </body>
+</html>

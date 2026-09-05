@@ -1,0 +1,183 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link rel="stylesheet" href="/styles.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&family=Montserrat:wght@300;600&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+  </head>
+  <body>
+    <div id="board" class="board">
+      <div class="team-panel home-panel">
+        <div class="team-inner">
+          <div class="team-brand">
+            <div class="logo-wrap"><img id="homeLogo" class="logo" src="" alt="Home Logo" onerror="this.style.display='none'"/></div>
+            <div class="team-name-wrap">
+              <div id="homeName" class="team-name">Home</div>
+              <div id="homeMeta" class="team-meta">Fouls: <span id="homeFoulsSmall">0</span> &nbsp; TO: <span id="homeTimeoutsSmall">2</span></div>
+            </div>
+          </div>
+          <div id="homeScore" class="team-score">0</div>
+          <div id="homeBurst" class="points-burst" aria-hidden="true"></div>
+        </div>
+      </div>
+
+      <div class="clock-panel">
+        <div class="clock-wrap">
+          <div id="clock" class="clock">10:00</div>
+          <div id="quarter" class="quarter">Q1</div>
+        </div>
+      </div>
+
+      <div class="team-panel away-panel">
+        <div class="team-inner">
+          <div class="team-brand">
+            <div class="team-name-wrap right">
+              <div id="awayName" class="team-name">Away</div>
+              <div id="awayMeta" class="team-meta">Fouls: <span id="awayFoulsSmall">0</span> &nbsp; TO: <span id="awayTimeoutsSmall">2</span></div>
+            </div>
+            <div class="logo-wrap"><img id="awayLogo" class="logo" src="" alt="Away Logo" onerror="this.style.display='none'"/></div>
+          </div>
+          <div id="awayScore" class="team-score">0</div>
+          <div id="awayBurst" class="points-burst" aria-hidden="true"></div>
+        </div>
+      </div>
+    </div>
+
+    <button id="fsBtn" class="fs-btn" title="Toggle fullscreen">⤢</button>
+
+    <div class="announce" id="announceWrap" style="pointer-events:none">
+      <div class="card" id="announceCard">
+        <div class="foul-type" id="foulType">FOUL</div>
+        <div class="foul-main" id="foulMain">HOME #0</div>
+        <div class="foul-sub" id="foulSub">Personal</div>
+      </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+      const socket = io();
+      function fmtTime(sec) {
+        const m = Math.floor(sec/60);
+        const s = sec%60;
+        return `${m}:${s.toString().padStart(2,'0')}`;
+      }
+      socket.on('state', (s) => {
+        document.body.style.fontFamily = s.fontFamily || 'Montserrat, Arial, sans-serif';
+        document.getElementById('homeName').textContent = s.home.name;
+        document.getElementById('awayName').textContent = s.away.name;
+        document.getElementById('homeScore').textContent = s.home.score;
+        document.getElementById('awayScore').textContent = s.away.score;
+        document.getElementById('homeFoulsSmall').textContent = s.home.fouls;
+        document.getElementById('awayFoulsSmall').textContent = s.away.fouls;
+        document.getElementById('homeTimeoutsSmall').textContent = s.home.timeoutsRemaining;
+        document.getElementById('awayTimeoutsSmall').textContent = s.away.timeoutsRemaining;
+        document.getElementById('clock').textContent = fmtTime(s.clock);
+        document.getElementById('quarter').textContent = 'Q' + s.quarter;
+        document.getElementById('homeLogo').src = s.home.logo || '';
+        document.getElementById('awayLogo').src = s.away.logo || '';
+        document.querySelector('.home-panel').style.background = s.home.color || '#0052cc';
+        document.querySelector('.away-panel').style.background = s.away.color || '#cc0000';
+        document.querySelector('.home-panel').classList.toggle('bonus', !!s.bonus.home);
+        document.querySelector('.away-panel').classList.toggle('bonus', !!s.bonus.away);
+      });
+
+      // fullscreen button
+      const fsBtn = document.getElementById('fsBtn');
+      fsBtn.addEventListener('click', () => {
+        if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(()=>{});
+        else document.exitFullscreen().catch(()=>{});
+      });
+
+      // foul announcement handling
+      const announceCard = document.getElementById('announceCard');
+      const foulTypeEl = document.getElementById('foulType');
+      const foulMainEl = document.getElementById('foulMain');
+      const foulSubEl = document.getElementById('foulSub');
+      window.__state = null;
+      socket.on('state', (s) => { window.__state = s; });
+      socket.on('announceFoul', (p) => {
+        const teamLabel = (p.team === 'home') ? (window.__state?.home?.name || 'HOME') : (window.__state?.away?.name || 'AWAY');
+        foulMainEl.textContent = `${teamLabel} #${p.playerNumber || ''}`;
+        foulSubEl.textContent = p.type || '';
+        foulTypeEl.textContent = (p.type || '').toUpperCase();
+        const teamColor = (p.team === 'home') ? window.__state?.home?.color || '#0052cc' : window.__state?.away?.color || '#cc0000';
+        announceCard.style.border = `4px solid ${teamColor}`;
+        announceCard.classList.add('show');
+        const dur = Number(p.duration) || 4;
+        setTimeout(()=>{ announceCard.classList.remove('show'); }, dur*1000);
+      });
+
+      // dynamic scaling: compute --scale based on board size vs design size
+      (function(){
+        const design = { w: 1400, h: 700 };
+        const board = document.getElementById('board');
+        function updateScale(){
+          if (!board) return;
+          const rect = board.getBoundingClientRect();
+          const scale = Math.max(0.4, Math.min(2.0, Math.min(rect.width / design.w, rect.height / design.h)));
+          document.documentElement.style.setProperty('--scale', String(scale));
+        }
+        // ResizeObserver for the board container
+        try{
+          const ro = new ResizeObserver(()=> requestAnimationFrame(updateScale));
+          ro.observe(board);
+        } catch(e) { window.addEventListener('resize', updateScale); }
+        // initial
+        updateScale();
+      })();
+
+      // show transient +3 burst only for +3 events; size = 2x the team's score text
+      socket.on('scoreDelta', ({ team, points }) => {
+        if (!team || Number(points) !== 3) return; // only animate +3
+        const id = team === 'home' ? 'homeBurst' : 'awayBurst';
+        const scoreId = team === 'home' ? 'homeScore' : 'awayScore';
+        const panelClass = team === 'home' ? '.home-panel' : '.away-panel';
+        const el = document.getElementById(id);
+        const scoreEl = document.getElementById(scoreId);
+        const panel = document.querySelector(panelClass);
+        if (!el || !scoreEl || !panel) return;
+        // set text and color to white (always white for bursts)
+        el.textContent = '+3';
+        el.style.color = '#ffffff';
+        // compute current score font-size and set burst scale variable (2x)
+        try{
+          const cs = window.getComputedStyle(scoreEl).fontSize; // e.g. '96px'
+          const px = parseFloat(cs) || 48;
+          const scale = (px * 2) / 4.5 / 16; // normalize against base 4.5rem*16 to match CSS font-size baseline
+          // simpler: set CSS variable to 2 (double)
+          el.style.setProperty('--burst-scale', '2');
+        }catch(e){ el.style.setProperty('--burst-scale', '2'); }
+
+        // trigger elastic burst animation (use reflow minimally)
+        el.classList.remove('show');
+        requestAnimationFrame(()=> el.classList.add('show'));
+
+        // spawn confetti pieces inside the team panel, positioned by percentages and staggered
+        const confettiCount = 12;
+        for (let i=0;i<confettiCount;i++){
+          const c = document.createElement('div');
+          c.className = 'confetti';
+          const w = 6 + Math.random()*10; const h = 10 + Math.random()*18;
+          c.style.width = w + 'px';
+          c.style.height = h + 'px';
+          c.style.background = '#ffffff';
+          const tx = (Math.random()*260 - 130).toFixed(0) + 'px';
+          const ty = (-120 - Math.random()*140).toFixed(0) + 'px';
+          c.style.setProperty('--tx', tx);
+          c.style.setProperty('--ty', ty);
+          // put at centered percentage position inside panel to avoid layout reads
+          c.style.left = '50%';
+          c.style.top = '48%';
+          panel.appendChild(c);
+          // stagger start to reduce layout thrash
+          setTimeout(()=> c.classList.add('animate'), i * 30);
+          setTimeout(()=> { try{ c.remove(); }catch(e){} }, 1500 + i * 40);
+        }
+
+        // cleanup after animation
+        setTimeout(()=>{ el.classList.remove('show'); el.style.removeProperty('--burst-scale'); el.style.color = ''; }, 1600);
+      });
+    </script>
+  </body>
+</html>

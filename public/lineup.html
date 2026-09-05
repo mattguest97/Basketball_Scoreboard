@@ -1,0 +1,97 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Team Line-up</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&family=Montserrat:wght@300;600&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+      body { background:transparent; overflow:hidden; }
+      .lineup-board { display:grid; grid-template-columns:1fr 1fr; gap:2vw; width:100vw; min-height:100vh; padding:4vh 4vw; }
+      .lineup-team { align-self:center; min-width:0; color:#fff; border-radius:12px; overflow:hidden; box-shadow:0 8px 32px rgba(0,0,0,.28); }
+      .lineup-heading { display:flex; align-items:center; gap:1rem; padding:1rem 1.25rem; background:var(--team-color); }
+      .lineup-logo { width:4rem; height:4rem; object-fit:contain; border-radius:50%; background:rgba(255,255,255,.12); }
+      .lineup-name { font:700 clamp(1.8rem,4vw,4rem)/1 Oswald, sans-serif; }
+      .lineup-list { margin:0; padding:0; list-style:none; background:rgba(7,12,18,.88); }
+      .lineup-player { display:grid; grid-template-columns:3.5rem 1fr auto; align-items:center; gap:1rem; padding:.75rem 1.25rem; border-bottom:1px solid rgba(255,255,255,.12); font-size:clamp(1rem,2vw,2rem); }
+      .lineup-player.with-stats { grid-template-columns:3.5rem 1fr 4rem 4rem; }
+      .lineup-player:last-child { border-bottom:0; }
+      .player-number { font:700 1.4em/1 Orbitron, monospace; color:rgba(255,255,255,.7); }
+      .player-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+      .player-points { font:700 1.1em/1 Orbitron, monospace; color:#ffb347; }
+      .player-fouls { font:700 1.1em/1 Orbitron, monospace; color:#ff8f8f; }
+      .lineup-columns { display:grid; grid-template-columns:3.5rem 1fr 4rem 4rem; gap:1rem; padding:.45rem 1.25rem; background:rgba(0,0,0,.45); color:rgba(255,255,255,.7); font-size:.75rem; font-weight:600; letter-spacing:.08em; text-align:left; }
+      .lineup-columns span:nth-child(2) { text-align:left; }
+      .lineup-columns span:first-child { visibility:hidden; }
+      .lineup-board.hide-stats .lineup-columns, .lineup-board.hide-stats .player-points, .lineup-board.hide-stats .player-fouls { display:none; }
+      .lineup-board.hide-stats .lineup-player { grid-template-columns:3.5rem 1fr; }
+      .empty-lineup { padding:1rem 1.25rem; color:rgba(255,255,255,.65); }
+      .lineup-board.single-team { grid-template-columns:1fr; }
+      .lineup-board.single-team .lineup-team { width:min(100%, 760px); justify-self:center; }
+      .lineup-board.single-team .lineup-team:not(.selected) { display:none; }
+      @media (max-width:720px) {
+        .lineup-board { grid-template-columns:1fr; gap:1rem; padding:1rem; }
+        .lineup-team { align-self:auto; }
+        .lineup-heading { padding:.65rem .8rem; }
+        .lineup-logo { width:2.5rem; height:2.5rem; }
+        .lineup-player { padding:.5rem .8rem; gap:.6rem; }
+        .lineup-columns { gap:.6rem; padding:.35rem .8rem; grid-template-columns:2.5rem 1fr 3rem 3rem; }
+        .lineup-player.with-stats { grid-template-columns:2.5rem 1fr 3rem 3rem; }
+        .lineup-board.hide-stats .lineup-player { grid-template-columns:2.5rem 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="lineup-board">
+      <section class="lineup-team" id="homeTeam">
+        <header class="lineup-heading"><img class="lineup-logo" id="homeLogo" alt="" /><strong class="lineup-name" id="homeName">Home</strong></header>
+        <ul class="lineup-list" id="homeLineup"></ul>
+      </section>
+      <section class="lineup-team" id="awayTeam">
+        <header class="lineup-heading"><img class="lineup-logo" id="awayLogo" alt="" /><strong class="lineup-name" id="awayName">Away</strong></header>
+        <ul class="lineup-list" id="awayLineup"></ul>
+      </section>
+    </main>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+      const socket = io();
+      const params = new URLSearchParams(location.search);
+      const selectedTeam = ['home', 'away'].includes(params.get('team')) ? params.get('team') : null;
+      const showStats = params.get('pregame') !== '1' && params.get('points') !== '0';
+      const board = document.querySelector('.lineup-board');
+      if (!showStats) board.classList.add('hide-stats');
+      if (selectedTeam) {
+        board.classList.add('single-team');
+        document.getElementById(selectedTeam + 'Team').classList.add('selected');
+      }
+
+      function renderTeam(team, side) {
+        document.getElementById(side + 'Name').textContent = team.name || side;
+        const logo = document.getElementById(side + 'Logo');
+        logo.src = team.logo || '';
+        logo.style.display = team.logo ? 'block' : 'none';
+        document.getElementById(side + 'Team').style.setProperty('--team-color', team.color || (side === 'home' ? '#0052cc' : '#cc0000'));
+        const list = document.getElementById(side + 'Lineup');
+        list.innerHTML = showStats ? '<li class="lineup-columns"><span></span><span>Player</span><span>PTS</span><span>PF</span></li>' : '';
+        const players = Array.isArray(team.lineup) ? team.lineup : [];
+        if (!players.length) {
+          list.innerHTML = '<li class="empty-lineup">No line-up added</li>';
+          return;
+        }
+        players.forEach((player) => {
+          const row = document.createElement('li');
+          row.className = `lineup-player${showStats ? ' with-stats' : ''}`;
+          row.innerHTML = `<span class="player-number">#${escapeHtml(player.number)}</span><span class="player-name">${escapeHtml(player.name)}</span>${showStats ? `<span class="player-points">${Number(player.points) || 0}</span><span class="player-fouls">${Number(player.fouls) || 0}</span>` : ''}`;
+          list.appendChild(row);
+        });
+      }
+
+      function escapeHtml(value) {
+        return String(value || '').replace(/[&<>'"]/g, (character) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' }[character]));
+      }
+
+      socket.on('state', (state) => { renderTeam(state.home, 'home'); renderTeam(state.away, 'away'); });
+    </script>
+  </body>
+</html>

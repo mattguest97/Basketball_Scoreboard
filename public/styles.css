@@ -1,0 +1,117 @@
+:root{--bg:#040405;--fg:#ffffff;--muted:rgba(255,255,255,0.75);--accent:#ff8c00;--scale:1}
+html{font-size:calc(16px * var(--scale));}
+*{box-sizing:border-box}
+body{margin:0;font-family:Montserrat, Arial, sans-serif;background:#040405;color:var(--fg);overflow:hidden}
+html:has(> body > #board), html:has(> body > #board) body{background:transparent}
+
+/* full-screen scoreboard container */
+/* use a 3-column grid: left team, fixed center column, right team
+  so resizing the clock/center content doesn't reflow the side panels */
+.board{display:grid;grid-template-columns:minmax(0,1fr) minmax(220px,26vw) minmax(0,1fr);align-items:center;width:100vw;height:100vh;padding:0;gap:1vw}
+
+/* big left/right team slabs */
+.team-panel{display:flex;align-items:center;justify-content:center;border-radius:12px;position:relative;overflow:hidden;min-width:0}
+.team-panel::before{content:'';position:absolute;inset:0;filter:blur(12px)brightness(0.6);opacity:0.85}
+.team-inner{display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:2;width:100%; }
+
+.team-brand{display:flex;align-items:center;gap:18px;margin-bottom:3rem}
+.logo-wrap{width:120px;height:120px;border-radius:999px;background:rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:center;overflow:hidden}
+.logo{width:100px;height:100px;object-fit:contain}
+.team-name{font-family:Oswald, Arial, sans-serif;font-size:5.0rem;letter-spacing:1px;color:rgba(255,255,255,0.95)}
+.team-meta{font-size:3rem;color:rgba(255,255,255,0.8);margin-top:0.25rem}
+
+/* align team branding and score toward the center */
+.home-panel .team-brand{justify-content:flex-end;padding-right:3rem}
+.away-panel .team-brand{justify-content:flex-start;padding-left:3rem}
+.home-panel .team-name-wrap{display:flex;flex-direction:column;align-items:flex-end;text-align:right}
+.away-panel .team-name-wrap{display:flex;flex-direction:column;align-items:flex-start;text-align:left}
+.home-panel .team-score{align-self:flex-end;margin-right:3rem;text-align:right}
+.away-panel .team-score{align-self:flex-start;margin-left:3rem;text-align:left}
+
+/* central score area */
+.center-area{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.25rem;min-width:0}
+.score-row{display:flex;align-items:center;justify-content:space-between;width:100%;gap:1rem}
+.team-score{font-family:Orbitron, Oswald, Arial, sans-serif;font-size:14rem;color:#fff;text-shadow:0 6px 18px rgba(0,0,0,0.6);line-height:0.9;padding:1rem 1em;}
+
+.clock-wrap{background:linear-gradient(180deg,rgba(0,0,0,0.6),rgba(0,0,0,0.8));padding:5px 5px;border-radius:8px;display:flex;flex-direction:column;align-items:center}
+.clock-panel{min-width:0;display:flex;justify-content:center}
+.clock{font-family:Orbitron, Oswald, Arial, sans-serif;font-size:clamp(2rem,4vw,4rem);font-variant-numeric:tabular-nums;width:6ch;color:var(--accent);letter-spacing:2px;text-align:center;white-space:nowrap}
+.quarter{font-size:1.25rem;color:var(--muted);margin-top:6px}
+
+/* left/right specific adjustments */
+.home-panel::before{background:linear-gradient(120deg, rgba(0,0,0,0.25), rgba(0,0,0,0.15));}
+.away-panel::before{background:linear-gradient(60deg, rgba(0,0,0,0.25), rgba(0,0,0,0.15));}
+
+/* bonus glow */
+.team-panel.bonus{box-shadow:0 8px 48px rgba(255,200,80,0.18)}
+
+/* announcement card adjustments (scale with rems) */
+.announce .card{min-width:40rem;padding:1.25rem 2rem;background:#101820;color:#fff;border:4px solid #fff;border-radius:10px;box-shadow:0 12px 36px rgba(0,0,0,.75),0 0 0 2px rgba(255,255,255,.2);text-align:center}
+.foul-main{font-size:4.5rem}
+.foul-type{font-size:1.25rem}
+.foul-sub{font-size:1.25rem;color:#fff}
+
+/* points burst animation (e.g., +3) */
+.points-burst{
+  position:absolute;z-index:5;top:38%;left:50%;
+  transform:translate3d(-50%,-50%,0) scale(calc(var(--burst-scale,1) * 0.9));
+  font-family:Orbitron, Oswald, Arial, sans-serif;
+  font-size:4.5rem;color:#fff;opacity:0;pointer-events:none;
+  text-shadow:0 6px 18px rgba(0,0,0,0.6);
+  will-change:transform,opacity;
+  backface-visibility:hidden;
+}
+.points-burst.show{animation:pointsBurst 1.6s cubic-bezier(0.22,0.9,0.3,1) forwards}
+@keyframes pointsBurst{
+  0%{
+    opacity:0;
+    transform:translate3d(-50%,0,0) scale(calc(var(--burst-scale,1) * 0.55));
+  }
+  10%{
+    opacity:1;
+    transform:translate3d(-50%,-12%,0) scale(calc(var(--burst-scale,1) * 1.4));
+  }
+  25%{
+    transform:translate3d(-50%,-28%,0) scale(calc(var(--burst-scale,1) * 1.08));
+  }
+  45%{
+    opacity:0.98;
+    transform:translate3d(-50%,-56%,0) scale(calc(var(--burst-scale,1) * 1));
+  }
+  75%{
+    opacity:0.7;
+    transform:translate3d(-50%,-95%,0) scale(calc(var(--burst-scale,1) * 0.96));
+  }
+  100%{
+    opacity:0;
+    transform:translate3d(-50%,-140%,0) scale(calc(var(--burst-scale,1) * 0.9));
+  }
+}
+
+/* confetti pieces for +3 celebration */
+.confetti{
+  position:absolute;left:50%;top:50%;width:10px;height:18px;border-radius:2px;opacity:0;transform-origin:center;pointer-events:none;z-index:6;
+}
+.confetti.animate{animation:confettiFly 1.25s cubic-bezier(0.16,1,0.3,1) forwards}
+@keyframes confettiFly{
+  0%{opacity:1;transform:translate3d(0,0,0) rotate(0) scale(1)}
+  40%{opacity:1}
+  100%{opacity:0;transform:translate3d(var(--tx,0), calc(var(--ty,-160px)), 0) rotate(720deg) scale(0.85)}
+}
+
+/* responsive scaling: smaller screens */
+@media (max-width:1200px){
+  .team-score{font-size:9rem}
+  .team-name{font-size:7rem}
+}
+@media (max-width:900px){
+  .board{flex-direction:column;padding:0vh 0vw;gap:0rem}
+  .center-area{width:100%;order:2}
+  .team-panel{order:1;padding:0rem}
+  .team-score{font-size:6rem}
+  .logo-wrap{width:80px;height:80px}
+  .logo{width:64px;height:64px}
+}
+
+/* control panel inputs (kept readable on control page) */
+input, button, textarea, select { font-size:14px }

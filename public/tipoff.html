@@ -1,0 +1,73 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Time to Tip</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&family=Montserrat:wght@300;600&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+      body { background:transparent; overflow:hidden; }
+      .tipoff-wrap { display:flex; align-items:center; justify-content:center; width:100vw; min-height:100vh; padding:4vh 4vw; }
+      .tipoff-banner { width:min(100%, 1100px); overflow:hidden; color:#fff; border-radius:12px; background:rgba(7,12,18,.92); box-shadow:0 10px 40px rgba(0,0,0,.35); }
+      .tipoff-label { padding:.7rem 1.5rem; background:linear-gradient(90deg, #0052cc, #cc0000); font:700 clamp(1.2rem,3vw,2.5rem)/1 Oswald, sans-serif; text-align:center; letter-spacing:.06em; text-transform:uppercase; }
+      .tipoff-content { display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:1rem; padding:1.5rem 2rem; }
+      .tipoff-team { font:700 clamp(1.4rem,3.5vw,3.5rem)/1 Oswald, sans-serif; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+      .tipoff-team.away { text-align:right; }
+      .tipoff-vs { color:rgba(255,255,255,.65); font-size:clamp(1.5rem,2vw,1.5rem); text-transform:uppercase; }
+      .tipoff-countdown { padding:0 2rem 1.5rem; color:#ffb347; font:700 clamp(2rem,6vw,5rem)/1 Orbitron, monospace; text-align:center; font-variant-numeric:tabular-nums; }
+      @media (max-width:720px) {
+        .tipoff-wrap { padding:1rem; }
+        .tipoff-content { padding:1rem; gap:.5rem; }
+        .tipoff-countdown { padding:0 1rem 1rem; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="tipoff-wrap">
+      <section class="tipoff-banner" aria-live="polite">
+        <div id="tipoffLabel" class="tipoff-label">Time to Tip</div>
+        <div class="tipoff-content">
+          <strong id="homeName" class="tipoff-team">Home</strong>
+          <span class="tipoff-vs">vs</span>
+          <strong id="awayName" class="tipoff-team away">Away</strong>
+        </div>
+        <div id="countdown" class="tipoff-countdown">30:00</div>
+      </section>
+    </main>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+      const socket = io();
+      let secondsLeft = 1800;
+      let countdownRunning = false;
+
+      function formatTime(seconds) {
+        const safeSeconds = Math.max(0, Math.ceil(seconds));
+        const hours = Math.floor(safeSeconds / 3600);
+        const minutes = Math.floor((safeSeconds % 3600) / 60);
+        const secondsPart = safeSeconds % 60;
+        return hours ? `${hours}:${minutes.toString().padStart(2, '0')}:${secondsPart.toString().padStart(2, '0')}` : `${minutes}:${secondsPart.toString().padStart(2, '0')}`;
+      }
+
+      function renderCountdown() {
+        document.getElementById('countdown').textContent = formatTime(secondsLeft);
+        document.getElementById('tipoffLabel').textContent = secondsLeft > 0 ? 'Time to Tip' : 'Game Time';
+      }
+
+      socket.on('state', (state) => {
+        document.getElementById('homeName').textContent = state.home.name || 'Home';
+        document.getElementById('awayName').textContent = state.away.name || 'Away';
+        if (Number.isFinite(Number(state.tipoffSeconds))) secondsLeft = Math.max(0, Number(state.tipoffSeconds));
+        countdownRunning = !!state.tipoffRunning;
+        renderCountdown();
+      });
+
+      renderCountdown();
+      setInterval(() => {
+        if (!countdownRunning) return;
+        secondsLeft = Math.max(0, secondsLeft - 0.25);
+        renderCountdown();
+      }, 250);
+    </script>
+  </body>
+</html>

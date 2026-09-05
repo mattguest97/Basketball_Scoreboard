@@ -1,0 +1,116 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Live Stats Viewer</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <style>
+      body{margin:0;font-family:Montserrat,Arial,sans-serif;background:#071017;color:#fff}
+      .wrap{padding:18px;display:flex;gap:18px;align-items:flex-start}
+      .court{width:720px;height:400px;background:#eee;border-radius:8px;position:relative;overflow:hidden}
+      canvas{width:100%;height:100%;display:block}
+      .panel{flex:1;min-width:320px;background:rgba(255,255,255,0.03);padding:12px;border-radius:8px}
+      table{width:100%;border-collapse:collapse}
+      th,td{padding:6px 8px;border-bottom:1px solid rgba(255,255,255,0.04);font-size:14px}
+      .player-dot{position:absolute;transform:translate(-50%,-50%);pointer-events:none}
+      .muted{color:rgba(255,255,255,0.6)}
+    </style>
+  </head>
+  <body>
+    <div style="padding:12px"><a href="/" style="color:#fff;opacity:0.8">← Back to scoreboard</a></div>
+    <div class="wrap">
+      <div class="court" id="court">
+        <canvas id="courtCanvas"></canvas>
+      </div>
+      <div class="panel">
+        <h3>Team Stats</h3>
+        <div id="teamStats"><div class="muted">Waiting for data…</div></div>
+        <h3 style="margin-top:12px">Players</h3>
+        <div id="playerStats"><div class="muted">Waiting for data…</div></div>
+      </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+      const socket = io();
+      const canvas = document.getElementById('courtCanvas');
+      const ctx = canvas.getContext('2d');
+      function resizeCanvas(){
+        canvas.width = canvas.clientWidth * devicePixelRatio;
+        canvas.height = canvas.clientHeight * devicePixelRatio;
+        drawCourt();
+      }
+      window.addEventListener('resize', resizeCanvas);
+      resizeCanvas();
+
+      function drawCourt(){
+        const w = canvas.width, h = canvas.height;
+        ctx.clearRect(0,0,w,h);
+        ctx.save();
+        ctx.scale(devicePixelRatio, devicePixelRatio);
+        // simple court background
+        ctx.fillStyle = '#f7f7f7'; ctx.fillRect(0,0,canvas.clientWidth,canvas.clientHeight);
+        // center line
+        ctx.strokeStyle = '#ddd'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(canvas.clientWidth/2,10); ctx.lineTo(canvas.clientWidth/2,canvas.clientHeight-10); ctx.stroke();
+        ctx.restore();
+      }
+
+      // sample renderer for shot chart points
+      function renderShots(shots){
+        drawCourt();
+        if (!Array.isArray(shots)) return;
+        const rectW = canvas.clientWidth, rectH = canvas.clientHeight;
+        shots.forEach(s => {
+          // expect s.x and s.y as normalized (0..1) coords where (0,0) is top-left
+          const x = (s.x||0.5) * rectW;
+          const y = (s.y||0.5) * rectH;
+          ctx.beginPath(); ctx.arc(x*devicePixelRatio, y*devicePixelRatio, 6*devicePixelRatio, 0, Math.PI*2);
+          ctx.fillStyle = s.made ? 'rgba(32,160,32,0.95)' : 'rgba(220,24,24,0.9)';
+          ctx.fill();
+        });
+      }
+
+      function renderTeamStats(obj){
+        const el = document.getElementById('teamStats');
+        if (!obj) { el.innerHTML='<div class="muted">No team stats</div>'; return; }
+        let html = '<table><thead><tr><th>Team</th><th>PTS</th><th>FG%</th><th>3PT</th></tr></thead><tbody>';
+        (obj.teams||[]).forEach(t=>{
+          html += `<tr><td>${t.name}</td><td>${t.pts||0}</td><td>${t.fgpct||'0%'}</td><td>${t['3pt']||0}</td></tr>`;
+        });
+        html += '</tbody></table>';
+        el.innerHTML = html;
+      }
+
+      function renderPlayerStats(obj){
+        const el = document.getElementById('playerStats');
+        if (!obj) { el.innerHTML='<div class="muted">No player stats</div>'; return; }
+        let html = '<table><thead><tr><th>Player</th><th>PTS</th><th>REB</th><th>AST</th></tr></thead><tbody>';
+        (obj.players||[]).slice(0,30).forEach(p=>{
+          html += `<tr><td>${p.name} ${p.number?('#'+p.number):''}</td><td>${p.pts||0}</td><td>${p.reb||0}</td><td>${p.ast||0}</td></tr>`;
+        });
+        html += '</tbody></table>';
+        el.innerHTML = html;
+      }
+
+      // Example: expect incoming payload structure like { teams: [...], players: [...], shots: [...] }
+      socket.on('fibaUpdate', (payload) => {
+        // map payload to our renderers
+        renderTeamStats(payload);
+        renderPlayerStats(payload);
+        renderShots(payload.shots || []);
+      });
+
+      // local testing helper: fetch example json if present
+      async function tryLoadExample(){
+        try{
+          const r = await fetch('/example-fiba.json');
+          if (!r.ok) return;
+          const j = await r.json();
+          renderTeamStats(j); renderPlayerStats(j); renderShots(j.shots||[]);
+        }catch(e){}
+      }
+      tryLoadExample();
+    </script>
+  </body>
+</html>
