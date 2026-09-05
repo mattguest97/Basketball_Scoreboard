@@ -76,8 +76,8 @@
         document.getElementById('quarter').textContent = 'Q' + s.quarter;
         document.getElementById('homeLogo').src = s.home.logo || '';
         document.getElementById('awayLogo').src = s.away.logo || '';
-        document.querySelector('.home-panel').style.background = s.home.color || '#0052cc';
-        document.querySelector('.away-panel').style.background = s.away.color || '#cc0000';
+        document.querySelector('.home-panel').style.setProperty('--team-color', s.home.color || '#0052cc');
+        document.querySelector('.away-panel').style.setProperty('--team-color', s.away.color || '#cc0000');
         document.querySelector('.home-panel').classList.toggle('bonus', !!s.bonus.home);
         document.querySelector('.away-panel').classList.toggle('bonus', !!s.bonus.away);
       });

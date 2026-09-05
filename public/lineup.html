@@ -8,37 +8,37 @@
     <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&family=Montserrat:wght@300;600&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
     <style>
       body { background:transparent; overflow:hidden; }
-      .lineup-board { display:grid; grid-template-columns:1fr 1fr; gap:2vw; width:100vw; min-height:100vh; padding:4vh 4vw; }
-      .lineup-team { align-self:center; min-width:0; color:#fff; border-radius:12px; overflow:hidden; box-shadow:0 8px 32px rgba(0,0,0,.28); }
-      .lineup-heading { display:flex; align-items:center; gap:1rem; padding:1rem 1.25rem; background:var(--team-color); }
-      .lineup-logo { width:4rem; height:4rem; object-fit:contain; border-radius:50%; background:rgba(255,255,255,.12); }
-      .lineup-name { font:700 clamp(1.8rem,4vw,4rem)/1 Oswald, sans-serif; }
+      .lineup-board { --lineup-scale:1; display:grid; grid-template-columns:1fr 1fr; gap:2vw; width:100vw; height:100vh; padding:4vh 4vw; }
+      .lineup-team { align-self:center; min-width:0; max-height:calc(100vh - 8vh); color:#fff; border-radius:12px; overflow:hidden; box-shadow:0 8px 32px rgba(0,0,0,.28); }
+      .lineup-heading { display:flex; align-items:center; gap:calc(1rem * var(--lineup-scale)); padding:calc(1rem * var(--lineup-scale)) calc(1.25rem * var(--lineup-scale)); background:var(--team-color); }
+      .lineup-logo { width:calc(4rem * var(--lineup-scale)); height:calc(4rem * var(--lineup-scale)); object-fit:contain; border-radius:50%; background:rgba(255,255,255,.12); }
+      .lineup-name { font:700 calc(clamp(1.8rem,4vw,4rem) * var(--lineup-scale))/1 Oswald, sans-serif; }
       .lineup-list { margin:0; padding:0; list-style:none; background:rgba(7,12,18,.88); }
-      .lineup-player { display:grid; grid-template-columns:3.5rem 1fr auto; align-items:center; gap:1rem; padding:.75rem 1.25rem; border-bottom:1px solid rgba(255,255,255,.12); font-size:clamp(1rem,2vw,2rem); }
-      .lineup-player.with-stats { grid-template-columns:3.5rem 1fr 4rem 4rem; }
+      .lineup-player { display:grid; grid-template-columns:calc(4.5rem * var(--lineup-scale)) 1fr auto; align-items:center; gap:calc(1.35rem * var(--lineup-scale)); padding:calc(.75rem * var(--lineup-scale)) calc(1.25rem * var(--lineup-scale)); border-bottom:1px solid rgba(255,255,255,.12); font-size:calc(clamp(1rem,2vw,2rem) * var(--lineup-scale)); line-height:1.05; }
+      .lineup-player.with-stats { grid-template-columns:calc(4.5rem * var(--lineup-scale)) 1fr calc(4rem * var(--lineup-scale)) calc(4rem * var(--lineup-scale)); }
       .lineup-player:last-child { border-bottom:0; }
-      .player-number { font:700 1.4em/1 Orbitron, monospace; color:rgba(255,255,255,.7); }
-      .player-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+      .player-number { font:700 1.15em/1 Orbitron, monospace; color:rgba(255,255,255,.7); min-width:0; white-space:nowrap; text-align:right; }
+      .player-name { min-width:0; padding-left:calc(.45rem * var(--lineup-scale)); border-left:1px solid rgba(255,255,255,.28); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font:600 .95em/1.05 Orbitron, monospace; }
       .player-points { font:700 1.1em/1 Orbitron, monospace; color:#ffb347; }
       .player-fouls { font:700 1.1em/1 Orbitron, monospace; color:#ff8f8f; }
-      .lineup-columns { display:grid; grid-template-columns:3.5rem 1fr 4rem 4rem; gap:1rem; padding:.45rem 1.25rem; background:rgba(0,0,0,.45); color:rgba(255,255,255,.7); font-size:.75rem; font-weight:600; letter-spacing:.08em; text-align:left; }
+      .lineup-columns { display:grid; grid-template-columns:calc(4.5rem * var(--lineup-scale)) 1fr calc(4rem * var(--lineup-scale)) calc(4rem * var(--lineup-scale)); gap:calc(1rem * var(--lineup-scale)); padding:calc(.45rem * var(--lineup-scale)) calc(1.25rem * var(--lineup-scale)); background:rgba(0,0,0,.45); color:rgba(255,255,255,.7); font-size:calc(.75rem * var(--lineup-scale)); font-weight:600; letter-spacing:.08em; text-align:left; }
       .lineup-columns span:nth-child(2) { text-align:left; }
       .lineup-columns span:first-child { visibility:hidden; }
       .lineup-board.hide-stats .lineup-columns, .lineup-board.hide-stats .player-points, .lineup-board.hide-stats .player-fouls { display:none; }
-      .lineup-board.hide-stats .lineup-player { grid-template-columns:3.5rem 1fr; }
-      .empty-lineup { padding:1rem 1.25rem; color:rgba(255,255,255,.65); }
+      .lineup-board.hide-stats .lineup-player { grid-template-columns:calc(4.5rem * var(--lineup-scale)) 1fr; }
+      .empty-lineup { padding:calc(1rem * var(--lineup-scale)) calc(1.25rem * var(--lineup-scale)); color:rgba(255,255,255,.65); }
       .lineup-board.single-team { grid-template-columns:1fr; }
       .lineup-board.single-team .lineup-team { width:min(100%, 760px); justify-self:center; }
       .lineup-board.single-team .lineup-team:not(.selected) { display:none; }
       @media (max-width:720px) {
         .lineup-board { grid-template-columns:1fr; gap:1rem; padding:1rem; }
         .lineup-team { align-self:auto; }
-        .lineup-heading { padding:.65rem .8rem; }
-        .lineup-logo { width:2.5rem; height:2.5rem; }
-        .lineup-player { padding:.5rem .8rem; gap:.6rem; }
-        .lineup-columns { gap:.6rem; padding:.35rem .8rem; grid-template-columns:2.5rem 1fr 3rem 3rem; }
-        .lineup-player.with-stats { grid-template-columns:2.5rem 1fr 3rem 3rem; }
-        .lineup-board.hide-stats .lineup-player { grid-template-columns:2.5rem 1fr; }
+        .lineup-heading { padding:calc(.65rem * var(--lineup-scale)) calc(.8rem * var(--lineup-scale)); }
+        .lineup-logo { width:calc(2.5rem * var(--lineup-scale)); height:calc(2.5rem * var(--lineup-scale)); }
+        .lineup-player { padding:calc(.5rem * var(--lineup-scale)) calc(.8rem * var(--lineup-scale)); gap:calc(.8rem * var(--lineup-scale)); }
+        .lineup-columns { gap:calc(.6rem * var(--lineup-scale)); padding:calc(.35rem * var(--lineup-scale)) calc(.8rem * var(--lineup-scale)); grid-template-columns:calc(3.25rem * var(--lineup-scale)) 1fr calc(3rem * var(--lineup-scale)) calc(3rem * var(--lineup-scale)); }
+        .lineup-player.with-stats { grid-template-columns:calc(3.25rem * var(--lineup-scale)) 1fr calc(3rem * var(--lineup-scale)) calc(3rem * var(--lineup-scale)); }
+        .lineup-board.hide-stats .lineup-player { grid-template-columns:calc(3.25rem * var(--lineup-scale)) 1fr; }
       }
     </style>
   </head>
@@ -66,6 +66,18 @@
         document.getElementById(selectedTeam + 'Team').classList.add('selected');
       }
 
+      function updateLineupScale() {
+        const playerCounts = ['home', 'away'].map((side) => document.querySelectorAll(`#${side}Lineup .lineup-player`).length);
+        const maxPlayers = Math.max(1, ...playerCounts);
+        const availableHeight = window.innerHeight * 0.92;
+        const estimatedRowHeight = window.innerWidth <= 720 ? 52 : 70;
+        const estimatedHeaderHeight = window.innerWidth <= 720 ? 64 : 100;
+        const estimatedColumnHeight = showStats ? (window.innerWidth <= 720 ? 28 : 40) : 0;
+        const requiredHeight = maxPlayers * estimatedRowHeight + estimatedHeaderHeight + estimatedColumnHeight;
+        const scale = Math.max(0.5, Math.min(1, availableHeight / requiredHeight));
+        board.style.setProperty('--lineup-scale', scale.toFixed(3));
+      }
+
       function renderTeam(team, side) {
         document.getElementById(side + 'Name').textContent = team.name || side;
         const logo = document.getElementById(side + 'Logo');
@@ -85,13 +97,15 @@
           row.innerHTML = `<span class="player-number">#${escapeHtml(player.number)}</span><span class="player-name">${escapeHtml(player.name)}</span>${showStats ? `<span class="player-points">${Number(player.points) || 0}</span><span class="player-fouls">${Number(player.fouls) || 0}</span>` : ''}`;
           list.appendChild(row);
         });
+        updateLineupScale();
       }
 
       function escapeHtml(value) {
         return String(value || '').replace(/[&<>'"]/g, (character) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' }[character]));
       }
 
-      socket.on('state', (state) => { renderTeam(state.home, 'home'); renderTeam(state.away, 'away'); });
+      window.addEventListener('resize', updateLineupScale);
+      socket.on('state', (state) => { renderTeam(state.home, 'home'); renderTeam(state.away, 'away'); updateLineupScale(); });
     </script>
   </body>
 </html>

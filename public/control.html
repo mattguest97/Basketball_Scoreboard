@@ -78,13 +78,6 @@
           <div><span>Score</span><strong id="homeCurrentScore">0</strong></div>
           <div><span>Fouls</span><strong id="homeCurrentFouls">0</strong></div>
         </div>
-        <div class="advanced-control">
-          <input id="homeNameInput" placeholder="Team name" /><br/>
-          <label>Logo: <input id="homeLogoFile" type="file" accept="image/*" onchange="handleLogoFile('home', this)" /></label>
-          <div><input id="homeLogoInput" placeholder="Or paste Logo URL" style="width:70%" /></div>
-          <div id="homeLogoPreview" style="margin-top:6px;font-size:13px;color:#333"></div>
-          <input id="homeColorInput" type="color" value="#0052cc" />
-        </div>
         <div class="score-controls">
           <button class="btn" onclick="inc('home',3)">+3</button>
           <button class="btn" onclick="inc('home',2)">+2</button>
@@ -102,16 +95,9 @@
 
       <div class="panel">
         <h3>Away Team</h3>
-        <div class="live-summary" id="awayLiveSummary" style="border-left-color:#cc0000">
+        <div class="live-summary" id="awayLiveSummary">
           <div><span>Score</span><strong id="awayCurrentScore">0</strong></div>
           <div><span>Fouls</span><strong id="awayCurrentFouls">0</strong></div>
-        </div>
-        <div class="advanced-control">
-          <input id="awayNameInput" placeholder="Team name" /><br/>
-          <label>Logo: <input id="awayLogoFile" type="file" accept="image/*" onchange="handleLogoFile('away', this)" /></label>
-          <div><input id="awayLogoInput" placeholder="Or paste Logo URL" style="width:70%" /></div>
-          <div id="awayLogoPreview" style="margin-top:6px;font-size:13px;color:#333"></div>
-          <input id="awayColorInput" type="color" value="#cc0000" />
         </div>
         <div class="score-controls">
           <button class="btn" onclick="inc('away',3)">+3</button>
@@ -148,16 +134,7 @@
           <button class="btn" onclick="clockAction('reset')">Reset Timer</button>
         </div>
         <div>
-          <label>Font: 
-            <select id="fontSelect" onchange="fontSelectChanged()">
-              <option value="Montserrat, Arial, sans-serif">Default (Montserrat)</option>
-              <option value="Oswald, Arial, sans-serif">Oswald (score)</option>
-              <option value="Roboto, Arial, sans-serif">Roboto</option>
-              <option value="Poppins, Arial, sans-serif">Poppins</option>
-              <option value="Arial, sans-serif">Arial (system)</option>
-              <option value="custom">Custom...</option>
-            </select>
-          </label>
+          
           <div id="fontCustomWrap" style="display:none;margin-top:6px">
             <input id="fontCustomInput" placeholder="e.g. 'My Font', Arial, sans-serif" style="width:90%" />
           </div>
@@ -231,7 +208,6 @@
           </label>
           <div>
             <button class="btn" onclick="loadSavedTeam()">Load Team</button>
-            <button class="btn" onclick="saveCurrentTeam()">Save New Team</button>
           </div>
           <div>
             <button class="btn" onclick="updateSavedTeam()">Update Saved Team</button>
@@ -249,13 +225,14 @@
             <select id="tipoffTitle" onchange="setTipoffTitle(this.value)">
               <option value="Time to Tip Off">Time to Tip Off</option>
               <option value="End of Q1">End of Q1</option>
-              <option value="HT">HT</option>
-              <option value="End of Qt3">End of Qt3</option>
-              <option value="FT">FT</option>
+              <option value="HT">Half Time</option>
+              <option value="End of Q3">End of Qt3</option>
+              <option value="FT">Full Time</option>
             </select>
           </label>
         </div>
         <div class="tipoff-controls">
+                  <div class="lineup-help">Select if you want to show the current score.</div>
           <label><input id="tipoffShowScore" type="checkbox" checked onchange="setTipoffScoreVisibility(this.checked)" /> Show current score</label>
         </div>
         <div class="tipoff-controls">
@@ -303,11 +280,8 @@
       })();
 
       const socket = io();
-      let homeLogoData = null;
-      let awayLogoData = null;
       let lineupInitialised = false;
       let savedTeams = [];
-      let teamInputsInitialised = false;
 
       socket.on('state', (state) => {
         const tipoffSeconds = Number.isFinite(Number(state.tipoffSeconds)) ? Math.max(0, Number(state.tipoffSeconds)) : 1800;
@@ -315,6 +289,8 @@
         document.getElementById('homeCurrentFouls').textContent = state.home.fouls;
         document.getElementById('awayCurrentScore').textContent = state.away.score;
         document.getElementById('awayCurrentFouls').textContent = state.away.fouls;
+        document.getElementById('homeLiveSummary').style.borderLeftColor = state.home.color || '#0052cc';
+        document.getElementById('awayLiveSummary').style.borderLeftColor = state.away.color || '#cc0000';
         document.getElementById('timerDisplay').textContent = formatClock(state.clock);
         document.getElementById('timerState').textContent = state.running ? 'Running' : (state.clock <= 0 ? 'Finished' : 'Stopped');
         document.getElementById('startTimerBtn').disabled = state.running;
@@ -327,11 +303,6 @@
         document.getElementById('tipoffSeconds').value = tipoffSeconds % 60;
         if (state.tipoffTitle) document.getElementById('tipoffTitle').value = state.tipoffTitle;
         document.getElementById('tipoffShowScore').checked = state.tipoffShowScore !== false;
-        if (!teamInputsInitialised) {
-          setTeamInputs('home', state.home);
-          setTeamInputs('away', state.away);
-          teamInputsInitialised = true;
-        }
         if (!lineupInitialised) {
           document.getElementById('homeLineupInput').value = lineupText(state.home.lineup);
           document.getElementById('awayLineupInput').value = lineupText(state.away.lineup);
@@ -358,13 +329,7 @@
       }
 
       function setTeamInputs(side, team) {
-        document.getElementById(`${side}NameInput`).value = team.name || '';
-        document.getElementById(`${side}ColorInput`).value = team.color || (side === 'home' ? '#0052cc' : '#cc0000');
-        document.getElementById(`${side}LogoInput`).value = team.logo && !team.logo.startsWith('data:') ? team.logo : '';
-        document.getElementById(`${side}LogoPreview`).textContent = team.logo && team.logo.startsWith('data:') ? 'Saved local logo' : '';
         document.getElementById(`${side}LineupInput`).value = lineupText(team.players || team.lineup || []);
-        if (side === 'home') homeLogoData = team.logo && team.logo.startsWith('data:') ? team.logo : null;
-        else awayLogoData = team.logo && team.logo.startsWith('data:') ? team.logo : null;
       }
 
       function teamLibraryStatus(message) {
@@ -401,12 +366,10 @@
       }
 
       async function getTeamDraft(side) {
-        const logoInput = document.getElementById(`${side}LogoFile`);
-        const uploadedLogo = await readFileInputDataUrl(logoInput);
+        const selected = getSelectedSavedTeam();
+        if (!selected) return null;
         return {
-          name: document.getElementById(`${side}NameInput`).value.trim(),
-          color: document.getElementById(`${side}ColorInput`).value,
-          logo: uploadedLogo || (side === 'home' ? homeLogoData : awayLogoData) || document.getElementById(`${side}LogoInput`).value.trim(),
+          ...selected,
           players: parseLineup(document.getElementById(`${side}LineupInput`).value)
         };
       }
@@ -424,16 +387,12 @@
         }
       }
 
-      async function saveCurrentTeam() {
-        const side = document.getElementById('savedTeamSide').value;
-        await saveTeamProfile(await getTeamDraft(side), 'Team saved');
-      }
-
       async function updateSavedTeam() {
         const selected = getSelectedSavedTeam();
         if (!selected) return teamLibraryStatus('Select a saved team first');
         const side = document.getElementById('savedTeamSide').value;
-        await saveTeamProfile({ ...(await getTeamDraft(side)), id: selected.id }, 'Saved team updated');
+        const draft = await getTeamDraft(side);
+        await saveTeamProfile({ ...draft, id: selected.id }, 'Saved team updated');
       }
 
       function loadSavedTeam() {
@@ -482,35 +441,6 @@
         document.getElementById('tipoffLink').href = `/tipoff.html?minutes=${minutes}`;
       });
 
-      function handleLogoFile(team, input) {
-        const file = input.files && input.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = function(e) {
-          const dataUrl = e.target.result;
-          if (team === 'home') {
-            homeLogoData = dataUrl;
-            document.getElementById('homeLogoPreview').textContent = file.name + ' (local)';
-          } else {
-            awayLogoData = dataUrl;
-            document.getElementById('awayLogoPreview').textContent = file.name + ' (local)';
-          }
-        };
-        reader.readAsDataURL(file);
-      }
-
-      // utility: read a file input as DataURL and return Promise<string|null>
-      function readFileInputDataUrl(inputEl) {
-        return new Promise((resolve) => {
-          if (!inputEl || !inputEl.files || !inputEl.files[0]) return resolve(null);
-          const f = inputEl.files[0];
-          const r = new FileReader();
-          r.onload = (e) => resolve(e.target.result);
-          r.onerror = () => resolve(null);
-          r.readAsDataURL(f);
-        });
-      }
-
       function inc(team, pts) { socket.emit('increment', {team, points: pts}); }
       function foul(team, delta) { socket.emit('foul', {team, delta}); }
       function timeout(team) { socket.emit('timeout', {team}); }
@@ -549,27 +479,9 @@
       }
 
       async function applySettings(){
-        // ensure file reads complete before sending
-        const homeFileInput = document.getElementById('homeLogoFile');
-        const awayFileInput = document.getElementById('awayLogoFile');
-        const homeFileData = await readFileInputDataUrl(homeFileInput);
-        const awayFileData = await readFileInputDataUrl(awayFileInput);
-
-        const homeLogoUrl = document.getElementById('homeLogoInput').value.trim();
-        const awayLogoUrl = document.getElementById('awayLogoInput').value.trim();
-        const home = {
-          name: document.getElementById('homeNameInput').value || undefined,
-          logo: homeFileData || homeLogoData || (homeLogoUrl || undefined),
-          color: document.getElementById('homeColorInput').value || undefined
-        };
-        const away = {
-          name: document.getElementById('awayNameInput').value || undefined,
-          logo: awayFileData || awayLogoData || (awayLogoUrl || undefined),
-          color: document.getElementById('awayColorInput').value || undefined
-        };
         let font = document.getElementById('fontSelect').value;
         if (font === 'custom') font = document.getElementById('fontCustomInput').value || undefined;
-        socket.emit('control', { home, away, fontFamily: font });
+        socket.emit('control', { fontFamily: font });
 
         // quick visual confirmation
         const btn = document.querySelector('button[onclick="applySettings()"]');

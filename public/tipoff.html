@@ -10,7 +10,7 @@
       body { background:transparent; overflow:hidden; }
       .tipoff-wrap { display:flex; align-items:center; justify-content:center; width:100vw; min-height:100vh; padding:4vh 4vw; }
       .tipoff-banner { width:min(100%, 1100px); overflow:hidden; color:#fff; border-radius:12px; background:rgba(7,12,18,.92); box-shadow:0 10px 40px rgba(0,0,0,.35); }
-      .tipoff-label { padding:.7rem 1.5rem; background:linear-gradient(90deg, #0052cc, #cc0000); font:700 clamp(1.2rem,3vw,2.5rem)/1 Oswald, sans-serif; text-align:center; letter-spacing:.06em; text-transform:uppercase; }
+      .tipoff-label { padding:.7rem 1.5rem; background:linear-gradient(90deg, var(--home-color, #0052cc), var(--away-color, #cc0000)); font:700 clamp(1.2rem,3vw,2.5rem)/1 Oswald, sans-serif; text-align:center; letter-spacing:.06em; text-transform:uppercase; }
       .tipoff-content { display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:1rem; padding:1.5rem 2rem; }
       .tipoff-team-wrap { min-width:0; }
       .tipoff-team { display:block; font:700 clamp(1.82rem,4.55vw,4.55rem)/1 Oswald, sans-serif; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -72,6 +72,8 @@
         document.getElementById('awayName').textContent = state.away.name || 'Away';
         document.getElementById('homeScore').textContent = Number(state.home.score) || 0;
         document.getElementById('awayScore').textContent = Number(state.away.score) || 0;
+        document.querySelector('.tipoff-banner').style.setProperty('--home-color', state.home.color || '#0052cc');
+        document.querySelector('.tipoff-banner').style.setProperty('--away-color', state.away.color || '#cc0000');
         if (Number.isFinite(Number(state.tipoffSeconds))) secondsLeft = Math.max(0, Number(state.tipoffSeconds));
         countdownRunning = !!state.tipoffRunning;
         if (state.tipoffTitle) tipoffTitle = state.tipoffTitle;
