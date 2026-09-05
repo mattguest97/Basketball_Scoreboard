@@ -6,6 +6,10 @@ The FIBA stats are currently a work in progress and don't currently work. I am a
 
 A browser-based basketball scoreboard for Portsmouth Force. The control panel updates the main display and overlay pages in real time using Socket.IO.
 
+## Not Working
+- Logos
+- FIBA integration
+
 ## Features
 
 - Live home and away scores with one-point undo controls.
