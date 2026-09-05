@@ -256,6 +256,9 @@
           </label>
         </div>
         <div class="tipoff-controls">
+          <label><input id="tipoffShowScore" type="checkbox" checked onchange="setTipoffScoreVisibility(this.checked)" /> Show current score</label>
+        </div>
+        <div class="tipoff-controls">
           <label>Minutes: <input id="tipoffMinutes" type="number" min="0" value="30" style="width:70px" /></label>
           <label>Seconds: <input id="tipoffSeconds" type="number" min="0" max="59" value="0" style="width:60px" /></label>
           <button class="btn" onclick="setTipoff()">Set Time</button>
@@ -323,6 +326,7 @@
         document.getElementById('tipoffMinutes').value = Math.floor(tipoffSeconds / 60);
         document.getElementById('tipoffSeconds').value = tipoffSeconds % 60;
         if (state.tipoffTitle) document.getElementById('tipoffTitle').value = state.tipoffTitle;
+        document.getElementById('tipoffShowScore').checked = state.tipoffShowScore !== false;
         if (!teamInputsInitialised) {
           setTeamInputs('home', state.home);
           setTeamInputs('away', state.away);
@@ -513,9 +517,11 @@
       function clockAction(act) { socket.emit('clock', { action: act }); }
       function tipoffAction(action) {
         const title = document.getElementById('tipoffTitle').value;
-        socket.emit('tipoff', { action, title });
+        const showScore = document.getElementById('tipoffShowScore').checked;
+        socket.emit('tipoff', { action, title, showScore });
       }
       function setTipoffTitle(title) { socket.emit('tipoff', { action: 'title', value: title }); }
+      function setTipoffScoreVisibility(showScore) { socket.emit('tipoff', { action: 'scoreVisibility', value: showScore }); }
       function setTipoff() {
         const minutes = Math.max(0, Number(document.getElementById('tipoffMinutes').value) || 0);
         const seconds = Math.max(0, Math.min(59, Number(document.getElementById('tipoffSeconds').value) || 0));

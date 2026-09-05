@@ -110,6 +110,7 @@ let state = {
   tipoffSeconds: 1800,
   tipoffRunning: false,
   tipoffTitle: 'Time to Tip Off',
+  tipoffShowScore: true,
   fontFamily: 'Arial, sans-serif',
   bonus: { home: false, away: false }
 };
@@ -221,10 +222,11 @@ io.on('connection', (socket) => {
     io.emit('state', state);
   });
 
-  socket.on('tipoff', ({ action, value, title }) => {
+  socket.on('tipoff', ({ action, value, title, showScore }) => {
     const allowedTitles = ['Time to Tip Off', 'End of Q1', 'HT', 'End of Qt3', 'FT'];
     if (action === 'start' && state.tipoffSeconds > 0) {
       if (allowedTitles.includes(title)) state.tipoffTitle = title;
+      if (typeof showScore === 'boolean') state.tipoffShowScore = showScore;
       if (!clockTimer) clockTimer = setInterval(tick, 1000);
       state.tipoffRunning = true;
     } else if (action === 'pause') {
@@ -233,10 +235,13 @@ io.on('connection', (socket) => {
       state.tipoffSeconds = Math.max(0, Number(value) || 0);
     } else if (action === 'title') {
       if (allowedTitles.includes(value)) state.tipoffTitle = value;
+    } else if (action === 'scoreVisibility') {
+      if (typeof value === 'boolean') state.tipoffShowScore = value;
     } else if (action === 'reset') {
       state.tipoffSeconds = 1800;
       state.tipoffRunning = false;
       state.tipoffTitle = 'Time to Tip Off';
+      state.tipoffShowScore = true;
     }
     io.emit('state', state);
   });
@@ -268,6 +273,7 @@ io.on('connection', (socket) => {
     state.tipoffSeconds = 1800;
     state.tipoffRunning = false;
     state.tipoffTitle = 'Time to Tip Off';
+    state.tipoffShowScore = true;
     updateBonusFlags();
     io.emit('state', state);
   });
