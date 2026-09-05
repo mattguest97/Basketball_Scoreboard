@@ -26,7 +26,7 @@
   <body>
     <main class="tipoff-wrap">
       <section class="tipoff-banner" aria-live="polite">
-        <div id="tipoffLabel" class="tipoff-label">Time to Tip</div>
+        <div id="tipoffLabel" class="tipoff-label">Time to Tip Off</div>
         <div class="tipoff-content">
           <strong id="homeName" class="tipoff-team">Home</strong>
           <span class="tipoff-vs">vs</span>
@@ -40,6 +40,7 @@
       const socket = io();
       let secondsLeft = 1800;
       let countdownRunning = false;
+      let tipoffTitle = 'Time to Tip Off';
 
       function formatTime(seconds) {
         const safeSeconds = Math.max(0, Math.ceil(seconds));
@@ -51,7 +52,7 @@
 
       function renderCountdown() {
         document.getElementById('countdown').textContent = formatTime(secondsLeft);
-        document.getElementById('tipoffLabel').textContent = secondsLeft > 0 ? 'Time to Tip' : 'Game Time';
+        document.getElementById('tipoffLabel').textContent = tipoffTitle;
       }
 
       socket.on('state', (state) => {
@@ -59,6 +60,7 @@
         document.getElementById('awayName').textContent = state.away.name || 'Away';
         if (Number.isFinite(Number(state.tipoffSeconds))) secondsLeft = Math.max(0, Number(state.tipoffSeconds));
         countdownRunning = !!state.tipoffRunning;
+        if (state.tipoffTitle) tipoffTitle = state.tipoffTitle;
         renderCountdown();
       });
 

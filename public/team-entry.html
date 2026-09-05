@@ -1,0 +1,169 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Team Entry</title>
+    <style>
+      :root { color-scheme: light; font-family: Arial, sans-serif; color: #20252b; background: #f3f5f7; }
+      * { box-sizing: border-box; }
+      body { margin: 0; padding: 24px; }
+      main { max-width: 760px; margin: 0 auto; }
+      section { background: #fff; border: 1px solid #d8dde3; border-radius: 6px; padding: 20px; margin-bottom: 16px; }
+      h1, h2 { margin-top: 0; }
+      .field { display: grid; gap: 6px; margin-bottom: 14px; }
+      input, select, button { font: inherit; padding: 8px; }
+      input[type="color"] { height: 40px; width: 70px; padding: 2px; }
+      .player { display: grid; grid-template-columns: 90px 1fr auto; gap: 8px; margin-bottom: 8px; }
+      button { cursor: pointer; border: 1px solid #9aa4af; border-radius: 4px; background: #fff; }
+      button.primary { color: #fff; border-color: #0052cc; background: #0052cc; }
+      .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+      .status { min-height: 20px; color: #4b5563; }
+      @media (max-width: 520px) {
+        body { padding: 10px; }
+        section { padding: 14px; }
+        .player { grid-template-columns: 70px 1fr; }
+        .player button { grid-column: 1 / -1; }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section>
+        <h1>Team Entry</h1>
+        <p>Create or update a saved team profile for the scoreboard.</p>
+        <div class="field">
+          <label for="existingTeam">Edit saved team</label>
+          <select id="existingTeam"><option value="">New team</option></select>
+        </div>
+        <div class="field">
+          <label for="teamName">Team name</label>
+          <input id="teamName" maxlength="80" required placeholder="e.g. Portsmouth Force" />
+        </div>
+        <div class="field">
+          <label for="teamColor">Team color</label>
+          <input id="teamColor" type="color" value="#0052cc" />
+        </div>
+        <div class="field">
+          <label for="teamLogo">Logo URL (optional)</label>
+          <input id="teamLogo" placeholder="https://example.com/logo.png" />
+        </div>
+      </section>
+
+      <section>
+        <h2>Players</h2>
+        <div id="players"></div>
+        <button type="button" onclick="addPlayer()">Add Player</button>
+      </section>
+
+      <section>
+        <div class="actions">
+          <button type="button" class="primary" onclick="saveTeam()">Save Team</button>
+          <button type="button" onclick="clearForm()">New Team</button>
+        </div>
+        <p id="status" class="status" aria-live="polite"></p>
+      </section>
+    </main>
+
+    <script>
+      let teams = [];
+      let selectedTeamId = '';
+
+      function addPlayer(player = {}) {
+        const row = document.createElement('div');
+        row.className = 'player';
+        row.innerHTML = `<input class="player-number" maxlength="5" placeholder="#" value="${escapeAttribute(player.number || '')}" aria-label="Player number" />` +
+          `<input class="player-name" maxlength="80" placeholder="Player name" value="${escapeAttribute(player.name || '')}" aria-label="Player name" />` +
+          '<button type="button" onclick="this.parentElement.remove()">Remove</button>';
+        document.getElementById('players').appendChild(row);
+      }
+
+      function escapeAttribute(value) {
+        return String(value).replace(/[&<>'"]/g, (character) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' }[character]));
+      }
+
+      function setStatus(message) {
+        document.getElementById('status').textContent = message;
+      }
+
+      function fillForm(team) {
+        selectedTeamId = team ? team.id : '';
+        document.getElementById('existingTeam').value = selectedTeamId;
+        document.getElementById('teamName').value = team ? team.name : '';
+        document.getElementById('teamColor').value = team ? team.color : '#0052cc';
+        document.getElementById('teamLogo').value = team ? team.logo : '';
+        document.getElementById('players').innerHTML = '';
+        (team && team.players || []).forEach(addPlayer);
+        if (!team) addPlayer();
+      }
+
+      function renderTeamOptions() {
+        const select = document.getElementById('existingTeam');
+        select.innerHTML = '<option value="">New team</option>';
+        teams.forEach((team) => {
+          const option = document.createElement('option');
+          option.value = team.id;
+          option.textContent = team.name;
+          select.appendChild(option);
+        });
+        select.value = selectedTeamId;
+      }
+
+      async function loadTeams() {
+        try {
+          const response = await fetch('/api/teams');
+          const data = await response.json();
+          teams = data.teams || [];
+          renderTeamOptions();
+        } catch (error) {
+          setStatus('Could not load saved teams.');
+        }
+      }
+
+      function collectPlayers() {
+        return [...document.querySelectorAll('.player')].map((row) => ({
+          number: row.querySelector('.player-number').value.trim(),
+          name: row.querySelector('.player-name').value.trim(),
+          points: 0,
+          fouls: 0
+        })).filter((player) => player.number || player.name);
+      }
+
+      async function saveTeam() {
+        const name = document.getElementById('teamName').value.trim();
+        if (!name) return setStatus('Enter a team name first.');
+        const team = {
+          id: selectedTeamId || undefined,
+          name,
+          color: document.getElementById('teamColor').value,
+          logo: document.getElementById('teamLogo').value.trim(),
+          players: collectPlayers()
+        };
+        try {
+          const response = await fetch('/api/teams', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(team) });
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.error || 'Save failed.');
+          teams = data.teams || [];
+          selectedTeamId = data.team.id;
+          renderTeamOptions();
+          setStatus(`${data.team.name} saved.`);
+        } catch (error) {
+          setStatus(error.message);
+        }
+      }
+
+      function clearForm() {
+        fillForm(null);
+        setStatus('');
+      }
+
+      document.getElementById('existingTeam').addEventListener('change', (event) => {
+        const team = teams.find((entry) => entry.id === event.target.value);
+        fillForm(team || null);
+      });
+
+      fillForm(null);
+      loadTeams();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,50 @@
+{
+  "teams": [
+    {
+      "id": "portsmouth-force",
+      "name": "Portsmouth Force",
+      "color": "#0052cc",
+      "logo": "",
+      "players": [
+        {
+          "number": "4",
+          "name": "Example Player One",
+          "points": 0,
+          "fouls": 0
+        },
+        {
+          "number": "7",
+          "name": "Example Player Two",
+          "points": 0,
+          "fouls": 0
+        },
+        {
+          "number": "12",
+          "name": "Example Player Three",
+          "points": 0,
+          "fouls": 0
+        }
+      ]
+    },
+    {
+      "id": "rockets",
+      "name": "Rockets",
+      "color": "#ca3536",
+      "logo": "",
+      "players": [
+        {
+          "number": "5",
+          "name": "Colhoun",
+          "points": 0,
+          "fouls": 0
+        },
+        {
+          "number": "12",
+          "name": "Smith",
+          "points": 0,
+          "fouls": 0
+        }
+      ]
+    }
+  ]
+}

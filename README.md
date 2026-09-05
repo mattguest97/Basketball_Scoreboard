@@ -11,6 +11,7 @@ A browser-based basketball scoreboard for Portsmouth Force. The control panel up
 - Live home and away scores with one-point undo controls.
 - FIBA-style game clock, quarter controls, fouls, bonus indicators, and timeouts.
 - Configurable team names, colours, logos, fonts, and player line-ups.
+- Saved team profiles in `teams.json`, manageable from the control panel.
 - Transparent tip-off, line-up, and foul announcement overlays for production use.
 - FIBA Live Stats preview with a shot map, team statistics, and player statistics.
 - Browser-based control panel with no database or build step required.
@@ -45,9 +46,11 @@ All pages are served from `public/` by the Express static-file server.
 | --- | --- |
 | `/` | Main scoreboard display |
 | `/control.html` | Live operator control panel |
+| `/team-entry.html` | Create and edit saved teams and numbered players |
 | `/tipoff.html` | Transparent pre-game countdown overlay |
 | `/lineup.html` | Line-up overlay; use `?team=home`, `?team=away`, or `?pregame=1` |
 | `/foul.html` | Foul announcement overlay |
 | `/stats.html` | FIBA Live Stats preview viewer |
+| `/api/teams` | List, save, and delete saved team profiles |
 | `POST /api/fiba` | Broadcast a JSON stats payload to connected stats viewers |
 

@@ -1,13 +1,78 @@
 const express = require('express');
 const http = require('http');
+const fs = require('fs');
 const path = require('path');
 const app = express();
 const server = http.createServer(app);
 const { Server } = require('socket.io');
 const io = new Server(server);
+const teamsFile = path.join(__dirname, 'teams.json');
+
+function readTeams() {
+  try {
+    const data = JSON.parse(fs.readFileSync(teamsFile, 'utf8'));
+    return Array.isArray(data.teams) ? data.teams : [];
+  } catch (error) {
+    return [];
+  }
+}
+
+function writeTeams(teams) {
+  fs.writeFileSync(teamsFile, JSON.stringify({ teams }, null, 2) + '\n', 'utf8');
+}
+
+function teamIdFor(name) {
+  return String(name).toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'team';
+}
+
+function normaliseTeam(team) {
+  const name = String(team.name || '').trim().slice(0, 80);
+  const color = String(team.color || '').trim();
+  const logo = typeof team.logo === 'string' ? team.logo.slice(0, 700000) : '';
+  const players = Array.isArray(team.players) ? team.players.slice(0, 15).map((player) => ({
+    number: String(player.number || '').trim().slice(0, 5),
+    name: String(player.name || '').trim().slice(0, 80),
+    points: Math.max(0, Number(player.points) || 0),
+    fouls: Math.max(0, Number(player.fouls) || 0)
+  })).filter((player) => player.number || player.name) : [];
+  if (!name || !/^#[0-9a-f]{6}$/i.test(color)) return null;
+  return { id: String(team.id || ''), name, color, logo, players };
+}
 
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json({ limit: '1mb' }));
+
+app.get('/api/teams', (req, res) => {
+  res.json({ teams: readTeams() });
+});
+
+app.post('/api/teams', (req, res) => {
+  const incoming = normaliseTeam(req.body || {});
+  if (!incoming) return res.status(400).json({ ok: false, error: 'Team name and a six-digit hex color are required.' });
+
+  const teams = readTeams();
+  const existingIndex = incoming.id ? teams.findIndex((team) => team.id === incoming.id) : -1;
+  if (existingIndex >= 0) {
+    teams[existingIndex] = incoming;
+  } else {
+    const baseId = teamIdFor(incoming.name);
+    let id = baseId;
+    let suffix = 2;
+    while (teams.some((team) => team.id === id)) id = `${baseId}-${suffix++}`;
+    incoming.id = id;
+    teams.push(incoming);
+  }
+  writeTeams(teams);
+  res.json({ ok: true, team: incoming, teams });
+});
+
+app.delete('/api/teams/:id', (req, res) => {
+  const teams = readTeams();
+  const filtered = teams.filter((team) => team.id !== req.params.id);
+  if (filtered.length === teams.length) return res.status(404).json({ ok: false, error: 'Team not found.' });
+  writeTeams(filtered);
+  res.json({ ok: true, teams: filtered });
+});
 
 // Simple relay endpoint for FIBA Live Stats or other live feeds.
 // POST JSON payloads to /api/fiba and they will be broadcast to connected clients as 'fibaUpdate'.
@@ -44,6 +109,7 @@ let state = {
   running: false,
   tipoffSeconds: 1800,
   tipoffRunning: false,
+  tipoffTitle: 'Time to Tip Off',
   fontFamily: 'Arial, sans-serif',
   bonus: { home: false, away: false }
 };
@@ -155,17 +221,22 @@ io.on('connection', (socket) => {
     io.emit('state', state);
   });
 
-  socket.on('tipoff', ({ action, value }) => {
+  socket.on('tipoff', ({ action, value, title }) => {
+    const allowedTitles = ['Time to Tip Off', 'End of Q1', 'HT', 'End of Qt3', 'FT'];
     if (action === 'start' && state.tipoffSeconds > 0) {
+      if (allowedTitles.includes(title)) state.tipoffTitle = title;
       if (!clockTimer) clockTimer = setInterval(tick, 1000);
       state.tipoffRunning = true;
     } else if (action === 'pause') {
       state.tipoffRunning = false;
     } else if (action === 'set') {
       state.tipoffSeconds = Math.max(0, Number(value) || 0);
+    } else if (action === 'title') {
+      if (allowedTitles.includes(value)) state.tipoffTitle = value;
     } else if (action === 'reset') {
       state.tipoffSeconds = 1800;
       state.tipoffRunning = false;
+      state.tipoffTitle = 'Time to Tip Off';
     }
     io.emit('state', state);
   });
@@ -196,6 +267,7 @@ io.on('connection', (socket) => {
     state.running = false;
     state.tipoffSeconds = 1800;
     state.tipoffRunning = false;
+    state.tipoffTitle = 'Time to Tip Off';
     updateBonusFlags();
     io.emit('state', state);
   });

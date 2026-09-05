@@ -24,6 +24,7 @@
       .score-controls { display:grid; grid-template-columns:repeat(4, 1fr); gap:4px; }
       .foul-controls { display:flex; gap:4px; }
       .timer-controls { display:flex; gap:4px; }
+      .team-library-controls { display:grid; gap:6px; }
       .foul-announcement-controls { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
       .foul-announcement-controls > div:last-child { grid-column:1 / -1; }
 
@@ -214,8 +215,46 @@
         <div id="lineupStatus" style="margin-top:4px;color:#666;font-size:12px"></div>
       </div>
       <div class="panel">
+        <h3>Saved Teams</h3>
+        <div class="lineup-help">Save team names, colors, and logos in the shared JSON team list.</div>
+        <div class="team-library-controls">
+          <label>Saved team:
+            <select id="savedTeamSelect">
+              <option value="">No saved teams</option>
+            </select>
+          </label>
+          <label>Apply to:
+            <select id="savedTeamSide">
+              <option value="home">Home</option>
+              <option value="away">Away</option>
+            </select>
+          </label>
+          <div>
+            <button class="btn" onclick="loadSavedTeam()">Load Team</button>
+            <button class="btn" onclick="saveCurrentTeam()">Save New Team</button>
+          </div>
+          <div>
+            <button class="btn" onclick="updateSavedTeam()">Update Saved Team</button>
+            <button class="btn" onclick="deleteSavedTeam()">Delete Saved Team</button>
+          </div>
+        </div>
+        <div id="teamLibraryStatus" style="margin-top:4px;color:#666;font-size:12px"></div>
+        <div style="margin-top:8px"><a href="/team-entry.html" target="_blank">Open Team Entry Page</a></div>
+      </div>
+      <div class="panel">
         <h3>Tip-off Banner</h3>
         <div class="lineup-help">Set the remaining time, then start or stop the shared countdown.</div>
+        <div class="tipoff-controls">
+          <label>Title:
+            <select id="tipoffTitle" onchange="setTipoffTitle(this.value)">
+              <option value="Time to Tip Off">Time to Tip Off</option>
+              <option value="End of Q1">End of Q1</option>
+              <option value="HT">HT</option>
+              <option value="End of Qt3">End of Qt3</option>
+              <option value="FT">FT</option>
+            </select>
+          </label>
+        </div>
         <div class="tipoff-controls">
           <label>Minutes: <input id="tipoffMinutes" type="number" min="0" value="30" style="width:70px" /></label>
           <label>Seconds: <input id="tipoffSeconds" type="number" min="0" max="59" value="0" style="width:60px" /></label>
@@ -264,6 +303,8 @@
       let homeLogoData = null;
       let awayLogoData = null;
       let lineupInitialised = false;
+      let savedTeams = [];
+      let teamInputsInitialised = false;
 
       socket.on('state', (state) => {
         const tipoffSeconds = Number.isFinite(Number(state.tipoffSeconds)) ? Math.max(0, Number(state.tipoffSeconds)) : 1800;
@@ -281,6 +322,12 @@
         document.getElementById('stopTipoffBtn').disabled = !state.tipoffRunning;
         document.getElementById('tipoffMinutes').value = Math.floor(tipoffSeconds / 60);
         document.getElementById('tipoffSeconds').value = tipoffSeconds % 60;
+        if (state.tipoffTitle) document.getElementById('tipoffTitle').value = state.tipoffTitle;
+        if (!teamInputsInitialised) {
+          setTeamInputs('home', state.home);
+          setTeamInputs('away', state.away);
+          teamInputsInitialised = true;
+        }
         if (!lineupInitialised) {
           document.getElementById('homeLineupInput').value = lineupText(state.home.lineup);
           document.getElementById('awayLineupInput').value = lineupText(state.away.lineup);
@@ -304,6 +351,114 @@
           const parts = line.split('|').map((part) => part.trim());
           return { number: parts[0] || '', name: parts[1] || '', points: Math.max(0, Number(parts[2]) || 0), fouls: Math.max(0, Number(parts[3]) || 0) };
         }).filter((player) => player.number || player.name);
+      }
+
+      function setTeamInputs(side, team) {
+        document.getElementById(`${side}NameInput`).value = team.name || '';
+        document.getElementById(`${side}ColorInput`).value = team.color || (side === 'home' ? '#0052cc' : '#cc0000');
+        document.getElementById(`${side}LogoInput`).value = team.logo && !team.logo.startsWith('data:') ? team.logo : '';
+        document.getElementById(`${side}LogoPreview`).textContent = team.logo && team.logo.startsWith('data:') ? 'Saved local logo' : '';
+        document.getElementById(`${side}LineupInput`).value = lineupText(team.players || team.lineup || []);
+        if (side === 'home') homeLogoData = team.logo && team.logo.startsWith('data:') ? team.logo : null;
+        else awayLogoData = team.logo && team.logo.startsWith('data:') ? team.logo : null;
+      }
+
+      function teamLibraryStatus(message) {
+        const status = document.getElementById('teamLibraryStatus');
+        status.textContent = message;
+        setTimeout(() => { status.textContent = ''; }, 2000);
+      }
+
+      function renderSavedTeams(selectedId) {
+        const select = document.getElementById('savedTeamSelect');
+        select.innerHTML = savedTeams.length ? '' : '<option value="">No saved teams</option>';
+        savedTeams.forEach((team) => {
+          const option = document.createElement('option');
+          option.value = team.id;
+          option.textContent = team.name;
+          select.appendChild(option);
+        });
+        if (selectedId) select.value = selectedId;
+      }
+
+      async function loadSavedTeams() {
+        try {
+          const response = await fetch('/api/teams');
+          const data = await response.json();
+          savedTeams = Array.isArray(data.teams) ? data.teams : [];
+          renderSavedTeams();
+        } catch (error) {
+          teamLibraryStatus('Could not load saved teams');
+        }
+      }
+
+      function getSelectedSavedTeam() {
+        return savedTeams.find((team) => team.id === document.getElementById('savedTeamSelect').value);
+      }
+
+      async function getTeamDraft(side) {
+        const logoInput = document.getElementById(`${side}LogoFile`);
+        const uploadedLogo = await readFileInputDataUrl(logoInput);
+        return {
+          name: document.getElementById(`${side}NameInput`).value.trim(),
+          color: document.getElementById(`${side}ColorInput`).value,
+          logo: uploadedLogo || (side === 'home' ? homeLogoData : awayLogoData) || document.getElementById(`${side}LogoInput`).value.trim(),
+          players: parseLineup(document.getElementById(`${side}LineupInput`).value)
+        };
+      }
+
+      async function saveTeamProfile(team, message) {
+        try {
+          const response = await fetch('/api/teams', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(team) });
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.error || 'Save failed');
+          savedTeams = data.teams;
+          renderSavedTeams(data.team.id);
+          teamLibraryStatus(message);
+        } catch (error) {
+          teamLibraryStatus(error.message);
+        }
+      }
+
+      async function saveCurrentTeam() {
+        const side = document.getElementById('savedTeamSide').value;
+        await saveTeamProfile(await getTeamDraft(side), 'Team saved');
+      }
+
+      async function updateSavedTeam() {
+        const selected = getSelectedSavedTeam();
+        if (!selected) return teamLibraryStatus('Select a saved team first');
+        const side = document.getElementById('savedTeamSide').value;
+        await saveTeamProfile({ ...(await getTeamDraft(side)), id: selected.id }, 'Saved team updated');
+      }
+
+      function loadSavedTeam() {
+        const selected = getSelectedSavedTeam();
+        if (!selected) return teamLibraryStatus('Select a saved team first');
+        const side = document.getElementById('savedTeamSide').value;
+        setTeamInputs(side, selected);
+        const teamPatch = {};
+        teamPatch[side] = { name: selected.name, color: selected.color, logo: selected.logo || '' };
+        socket.emit('control', teamPatch);
+        const lineupPatch = { lineup: {} };
+        lineupPatch.lineup[side] = selected.players || [];
+        socket.emit('control', lineupPatch);
+        teamLibraryStatus(`${selected.name} loaded to ${side}`);
+      }
+
+      async function deleteSavedTeam() {
+        const selected = getSelectedSavedTeam();
+        if (!selected) return teamLibraryStatus('Select a saved team first');
+        try {
+          const response = await fetch(`/api/teams/${encodeURIComponent(selected.id)}`, { method:'DELETE' });
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.error || 'Delete failed');
+          savedTeams = data.teams;
+          renderSavedTeams();
+          teamLibraryStatus('Saved team deleted');
+        } catch (error) {
+          teamLibraryStatus(error.message);
+        }
       }
 
       function saveLineup() {
@@ -356,7 +511,11 @@
       function foul(team, delta) { socket.emit('foul', {team, delta}); }
       function timeout(team) { socket.emit('timeout', {team}); }
       function clockAction(act) { socket.emit('clock', { action: act }); }
-      function tipoffAction(action) { socket.emit('tipoff', { action }); }
+      function tipoffAction(action) {
+        const title = document.getElementById('tipoffTitle').value;
+        socket.emit('tipoff', { action, title });
+      }
+      function setTipoffTitle(title) { socket.emit('tipoff', { action: 'title', value: title }); }
       function setTipoff() {
         const minutes = Math.max(0, Number(document.getElementById('tipoffMinutes').value) || 0);
         const seconds = Math.max(0, Math.min(59, Number(document.getElementById('tipoffSeconds').value) || 0));
@@ -410,6 +569,7 @@
         const btn = document.querySelector('button[onclick="applySettings()"]');
         if (btn) { const old = btn.textContent; btn.textContent = 'Applied'; setTimeout(()=> btn.textContent = old, 900); }
       }
+      loadSavedTeams();
       function resetAll(){ socket.emit('reset'); }
       function announceFoul(){
         const team = document.getElementById('announceTeam').value;
