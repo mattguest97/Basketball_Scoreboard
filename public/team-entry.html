@@ -14,7 +14,7 @@
       .field { display: grid; gap: 6px; margin-bottom: 14px; }
       input, select, button { font: inherit; padding: 8px; }
       input[type="color"] { height: 40px; width: 70px; padding: 2px; }
-      .player { display: grid; grid-template-columns: 90px 1fr auto; gap: 8px; margin-bottom: 8px; }
+      .player { display: grid; grid-template-columns: 80px 1fr 90px 90px auto; gap: 8px; margin-bottom: 8px; }
       button { cursor: pointer; border: 1px solid #9aa4af; border-radius: 4px; background: #fff; }
       button.primary { color: #fff; border-color: #0052cc; background: #0052cc; }
       .actions { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -22,7 +22,7 @@
       @media (max-width: 520px) {
         body { padding: 10px; }
         section { padding: 14px; }
-        .player { grid-template-columns: 70px 1fr; }
+        .player { grid-template-columns: 70px 1fr 1fr 1fr; }
         .player button { grid-column: 1 / -1; }
       }
     </style>
@@ -74,6 +74,8 @@
         row.className = 'player';
         row.innerHTML = `<input class="player-number" maxlength="5" placeholder="#" value="${escapeAttribute(player.number || '')}" aria-label="Player number" />` +
           `<input class="player-name" maxlength="80" placeholder="Player name" value="${escapeAttribute(player.name || '')}" aria-label="Player name" />` +
+          `<input class="player-points" type="number" min="0" step="1" placeholder="Points" value="${Number(player.points) || 0}" aria-label="Player points" />` +
+          `<input class="player-fouls" type="number" min="0" step="1" placeholder="Fouls" value="${Number(player.fouls) || 0}" aria-label="Player fouls" />` +
           '<button type="button" onclick="this.parentElement.remove()">Remove</button>';
         document.getElementById('players').appendChild(row);
       }
@@ -124,8 +126,8 @@
         return [...document.querySelectorAll('.player')].map((row) => ({
           number: row.querySelector('.player-number').value.trim(),
           name: row.querySelector('.player-name').value.trim(),
-          points: 0,
-          fouls: 0
+          points: Math.max(0, Number(row.querySelector('.player-points').value) || 0),
+          fouls: Math.max(0, Number(row.querySelector('.player-fouls').value) || 0)
         })).filter((player) => player.number || player.name);
       }
 
