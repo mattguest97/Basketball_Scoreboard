@@ -58,3 +58,6 @@ All pages are served from `public/` by the Express static-file server.
 | `/api/teams` | List, save, and delete saved team profiles |
 | `POST /api/fiba` | Broadcast a JSON stats payload to connected stats viewers |
 
+## Example Stream
+
+![alt text](<Team Entry.png>) ![alt text](Mobile_Control.png) ![alt text](Control_Laptop.png) ![alt text](<Both Line-ups.png>) ![alt text](Lineup.png) ![alt text](Scoreboard.png) ![alt text](<End Of.png>) ![alt text](<Time to Tip.png>)
